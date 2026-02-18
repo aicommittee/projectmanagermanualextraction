@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATI Manual Finder</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F3F4F6; color: #1F2937; display: flex; height: 100vh; overflow: hidden; }
+
+        /* Sidebar */
+        .sidebar { width: 280px; background: #1A3A5C; color: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar-header { padding: 24px 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+        .sidebar-header p { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 4px; }
+        .new-project-btn { margin: 16px 16px 8px; padding: 10px 16px; background: #2563EB; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .new-project-btn:hover { background: #1D4ED8; }
+        .project-list { flex: 1; overflow-y: auto; padding: 8px; }
+        .project-item { padding: 10px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-bottom: 2px; transition: background 0.15s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .project-item:hover { background: rgba(255,255,255,0.1); }
+        .project-item.active { background: rgba(255,255,255,0.15); font-weight: 600; }
+        .project-item .date { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+
+        /* Main area */
+        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .topbar { background: #fff; border-bottom: 1px solid #E5E7EB; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .topbar h2 { font-size: 18px; font-weight: 600; }
+        .topbar-actions { display: flex; gap: 8px; }
+        .topbar-actions button { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #D1D5DB; background: #fff; transition: all 0.15s; }
+        .topbar-actions button:hover { background: #F9FAFB; }
+        .btn-export { color: #2563EB; border-color: #2563EB; }
+        .btn-export:hover { background: #EFF6FF !important; }
+        .btn-delete { color: #EF4444; border-color: #EF4444; }
+        .btn-delete:hover { background: #FEF2F2 !important; }
+
+        .content { flex: 1; overflow-y: auto; padding: 24px; }
+
+        /* Empty state */
+        .empty-state { text-align: center; padding: 80px 20px; color: #9CA3AF; }
+        .empty-state h3 { font-size: 20px; color: #6B7280; margin-bottom: 8px; }
+
+        /* Stats cards */
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: #fff; border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .stat-card .label { font-size: 12px; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+        .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+        .stat-card.total .value { color: #1A3A5C; }
+        .stat-card.found .value { color: #22C55E; }
+        .stat-card.not-found .value { color: #EF4444; }
+        .stat-card.processing .value { color: #F59E0B; }
+
+        /* Progress bar */
+        .progress-section { background: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .progress-text { font-size: 13px; color: #6B7280; margin-bottom: 8px; }
+        .progress-bar { height: 8px; background: #E5E7EB; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #2563EB, #3B82F6); border-radius: 4px; transition: width 0.5s ease; }
+
+        /* Table */
+        .table-container { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { background: #F9FAFB; padding: 10px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E5E7EB; }
+        tbody td { padding: 12px 16px; border-bottom: 1px solid #F3F4F6; font-size: 13px; vertical-align: middle; }
+        tbody tr:hover { background: #F9FAFB; }
+
+        .model-pill { background: #F3F4F6; padding: 3px 8px; border-radius: 4px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; white-space: nowrap; }
+
+        /* Status badges */
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+        .badge-found { background: #DCFCE7; color: #166534; }
+        .badge-not_found { background: #FEE2E2; color: #991B1B; }
+        .badge-manual_entry { background: #FEF3C7; color: #92400E; }
+        .badge-pending { background: #F3F4F6; color: #6B7280; }
+
+        /* Manual link */
+        .manual-link { color: #2563EB; text-decoration: none; font-weight: 500; }
+        .manual-link:hover { text-decoration: underline; }
+
+        /* Inline input for not_found */
+        .inline-input { display: flex; gap: 6px; align-items: center; }
+        .inline-input input { padding: 4px 8px; border: 1px solid #D1D5DB; border-radius: 4px; font-size: 12px; width: 180px; }
+        .inline-input button { padding: 4px 10px; font-size: 11px; border-radius: 4px; cursor: pointer; border: none; font-weight: 600; }
+        .btn-save { background: #2563EB; color: #fff; }
+        .btn-save:hover { background: #1D4ED8; }
+        .btn-retry { background: #F3F4F6; color: #6B7280; border: 1px solid #D1D5DB !important; }
+        .btn-retry:hover { background: #E5E7EB; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+        .modal { background: #fff; border-radius: 12px; padding: 28px; width: 460px; max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .modal h3 { font-size: 18px; margin-bottom: 20px; }
+        .modal label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+        .modal input[type="text"] { width: 100%; padding: 10px 12px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 14px; margin-bottom: 16px; }
+        .modal input[type="text"]:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+        /* Drop zone */
+        .drop-zone { border: 2px dashed #D1D5DB; border-radius: 8px; padding: 32px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 20px; }
+        .drop-zone:hover, .drop-zone.drag-over { border-color: #2563EB; background: #EFF6FF; }
+        .drop-zone p { color: #6B7280; font-size: 14px; }
+        .drop-zone .selected-file { color: #2563EB; font-weight: 600; }
+
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+        .modal-actions button { padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
+        .btn-cancel { background: #F3F4F6; color: #374151; }
+        .btn-cancel:hover { background: #E5E7EB; }
+        .btn-upload { background: #2563EB; color: #fff; }
+        .btn-upload:hover { background: #1D4ED8; }
+        .btn-upload:disabled { background: #93C5FD; cursor: not-allowed; }
+
+        /* Processing overlay on upload button */
+        .btn-upload.loading { position: relative; color: transparent; }
+        .btn-upload.loading::after { content: ''; position: absolute; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; top: 50%; left: 50%; margin: -8px 0 0 -8px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <h1>ATI Manual Finder</h1>
+        <p>Product Manual &amp; Warranty Tool</p>
+    </div>
+    <button class="new-project-btn" onclick="openModal()">+ New Project</button>
+    <div class="project-list" id="projectList"></div>
+</aside>
+
+<!-- Main Content -->
+<div class="main">
+    <div class="topbar" id="topbar">
+        <h2 id="projectTitle">Select a project</h2>
+        <div class="topbar-actions" id="topbarActions" style="display:none;">
+            <button class="btn-export" onclick="exportExcel()">Export Excel</button>
+            <button class="btn-delete" onclick="deleteProject()">Delete</button>
+        </div>
+    </div>
+    <div class="content" id="content">
+        <div class="empty-state">
+            <h3>No project selected</h3>
+            <p>Upload a contract PDF to get started</p>
+        </div>
+    </div>
+</div>
+
+<!-- New Project Modal -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+        <h3>New Project</h3>
+        <label for="projectName">Project Name</label>
+        <input type="text" id="projectName" placeholder="e.g. Smith Residence AV Install">
+        <label>Contract PDF</label>
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <p id="dropText">Drag & drop a PDF here, or click to browse</p>
+        </div>
+        <input type="file" id="fileInput" accept=".pdf" style="display:none">
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="btn-upload" id="btnUpload" disabled onclick="uploadProject()">Upload &amp; Process</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+let currentProjectId = null;
+let pollInterval = null;
+let selectedFile = null;
+
+// ---------------------------------------------------------------------------
+// API helper
+// ---------------------------------------------------------------------------
+async function api(path, options = {}) {
+    const resp = await fetch('/api' + path, options);
+    if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error('API error ' + resp.status + ': ' + text);
+    }
+    return resp.json();
+}
+
+// ---------------------------------------------------------------------------
+// Projects sidebar
+// ---------------------------------------------------------------------------
+async function loadProjects() {
+    const projects = await api('/projects');
+    const list = document.getElementById('projectList');
+    if (projects.length === 0) {
+        list.innerHTML = '<p style="padding:16px;color:rgba(255,255,255,0.5);font-size:13px;">No projects yet</p>';
+        return;
+    }
+    list.innerHTML = projects.map(p => {
+        const d = new Date(p.created_at);
+        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return '<div class="project-item' + (p.id === currentProjectId ? ' active' : '') + '" onclick="loadProject(\'' + p.id + '\')">' +
+            '<div>' + escapeHtml(p.name) + '</div>' +
+            '<div class="date">' + dateStr + '</div>' +
+        '</div>';
+    }).join('');
+}
+
+// ---------------------------------------------------------------------------
+// Load a project
+// ---------------------------------------------------------------------------
+async function loadProject(id) {
+    currentProjectId = id;
+    stopPolling();
+
+    const data = await api('/projects/' + id);
+    const project = data.project;
+    const items = data.items;
+    const progress = data.progress;
+
+    document.getElementById('projectTitle').textContent = project.name;
+    document.getElementById('topbarActions').style.display = 'flex';
+    loadProjects(); // refresh active state
+
+    renderProjectView(items, progress);
+
+    if (!progress.done) {
+        startPolling(id);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Render project view
+// ---------------------------------------------------------------------------
+function renderProjectView(items, progress) {
+    const content = document.getElementById('content');
+
+    const total = items.length;
+    const found = items.filter(i => i.status === 'found').length;
+    const notFound = items.filter(i => i.status === 'not_found').length;
+    const pending = items.filter(i => i.status === 'pending').length;
+    const manualEntry = items.filter(i => i.status === 'manual_entry').length;
+
+    let html = '';
+
+    // Stats cards
+    html += '<div class="stats">';
+    html += '<div class="stat-card total"><div class="label">Total Products</div><div class="value">' + total + '</div></div>';
+    html += '<div class="stat-card found"><div class="label">Manuals Found</div><div class="value">' + (found + manualEntry) + '</div></div>';
+    html += '<div class="stat-card not-found"><div class="label">Not Found</div><div class="value">' + notFound + '</div></div>';
+    html += '<div class="stat-card processing"><div class="label">Processing</div><div class="value">' + pending + '</div></div>';
+    html += '</div>';
+
+    // Progress bar (only if processing)
+    if (!progress.done) {
+        const pct = total > 0 ? Math.round(((total - pending) / total) * 100) : 0;
+        html += '<div class="progress-section">';
+        html += '<div class="progress-text">' + escapeHtml(progress.message) + '</div>';
+        html += '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
+        html += '</div>';
+    }
+
+    // Product table
+    if (items.length > 0) {
+        html += '<div class="table-container"><table>';
+        html += '<thead><tr><th>Brand</th><th>Model</th><th>Product Name</th><th>Warranty</th><th>Manual</th><th>Status</th></tr></thead>';
+        html += '<tbody>';
+        items.forEach(item => {
+            const product = item.products;
+            const warranty = (product && product.warranty_length) ? escapeHtml(product.warranty_length) : '—';
+            html += '<tr>';
+            html += '<td>' + escapeHtml(item.brand || '') + '</td>';
+            html += '<td><span class="model-pill">' + escapeHtml(item.model_number || '') + '</span></td>';
+            html += '<td>' + escapeHtml(item.product_name || '') + '</td>';
+            html += '<td>' + warranty + '</td>';
+            html += '<td>' + renderManualCell(item) + '</td>';
+            html += '<td><span class="badge badge-' + item.status + '">' + formatStatus(item.status) + '</span></td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+    }
+
+    content.innerHTML = html;
+}
+
+function renderManualCell(item) {
+    if (item.status === 'found' || item.status === 'manual_entry') {
+        if (item.manual_url) {
+            return '<a class="manual-link" href="' + escapeHtml(item.manual_url) + '" target="_blank">Open Manual</a>';
+        }
+        return '—';
+    }
+    if (item.status === 'not_found') {
+        return '<div class="inline-input">' +
+            '<input type="text" placeholder="Paste manual URL" id="url-' + item.id + '">' +
+            '<button class="btn-save" onclick="saveManualUrl(\'' + item.id + '\')">Save</button>' +
+            '<button class="btn-retry" onclick="retryItem(\'' + item.id + '\')">Retry</button>' +
+        '</div>';
+    }
+    if (item.status === 'pending') {
+        return '<span style="color:#9CA3AF">Processing...</span>';
+    }
+    return '—';
+}
+
+function formatStatus(status) {
+    const labels = { found: 'Found', not_found: 'Not Found', manual_entry: 'Manual Entry', pending: 'Pending' };
+    return labels[status] || status;
+}
+
+// ---------------------------------------------------------------------------
+// Progress polling
+// ---------------------------------------------------------------------------
+function startPolling(projectId) {
+    stopPolling();
+    pollInterval = setInterval(async () => {
+        try {
+            const progress = await api('/projects/' + projectId + '/progress');
+            if (progress.done) {
+                stopPolling();
+                await loadProject(projectId);
+            } else {
+                // Update progress bar inline
+                const items = (await api('/projects/' + projectId)).items;
+                renderProjectView(items, progress);
+            }
+        } catch (e) {
+            console.error('Poll error:', e);
+        }
+    }, 2500);
+}
+
+function stopPolling() {
+    if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Save manual URL
+// ---------------------------------------------------------------------------
+async function saveManualUrl(itemId) {
+    const input = document.getElementById('url-' + itemId);
+    const url = input.value.trim();
+    if (!url) return;
+    await api('/items/' + itemId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manual_url: url, status: 'manual_entry' }),
+    });
+    await loadProject(currentProjectId);
+}
+
+// ---------------------------------------------------------------------------
+// Retry item
+// ---------------------------------------------------------------------------
+async function retryItem(itemId) {
+    const btn = event.target;
+    btn.textContent = '...';
+    btn.disabled = true;
+    try {
+        await api('/items/' + itemId + '/retry', { method: 'POST' });
+        await loadProject(currentProjectId);
+    } catch (e) {
+        alert('Retry failed: ' + e.message);
+        btn.textContent = 'Retry';
+        btn.disabled = false;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Export Excel
+// ---------------------------------------------------------------------------
+function exportExcel() {
+    if (!currentProjectId) return;
+    window.location.href = '/api/projects/' + currentProjectId + '/export';
+}
+
+// ---------------------------------------------------------------------------
+// Delete project
+// ---------------------------------------------------------------------------
+async function deleteProject() {
+    if (!currentProjectId) return;
+    if (!confirm('Delete this project and all its items?')) return;
+    await api('/projects/' + currentProjectId, { method: 'DELETE' });
+    currentProjectId = null;
+    stopPolling();
+    document.getElementById('projectTitle').textContent = 'Select a project';
+    document.getElementById('topbarActions').style.display = 'none';
+    document.getElementById('content').innerHTML = '<div class="empty-state"><h3>No project selected</h3><p>Upload a contract PDF to get started</p></div>';
+    await loadProjects();
+}
+
+// ---------------------------------------------------------------------------
+// New Project Modal
+// ---------------------------------------------------------------------------
+function openModal() {
+    selectedFile = null;
+    document.getElementById('projectName').value = '';
+    document.getElementById('dropText').textContent = 'Drag & drop a PDF here, or click to browse';
+    document.getElementById('dropText').className = '';
+    document.getElementById('btnUpload').disabled = true;
+    document.getElementById('modalOverlay').classList.add('open');
+    document.getElementById('fileInput').value = '';
+}
+
+function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function checkUploadReady() {
+    const name = document.getElementById('projectName').value.trim();
+    document.getElementById('btnUpload').disabled = !(name && selectedFile);
+}
+
+// File input change
+document.getElementById('fileInput').addEventListener('change', (e) => {
+    if (e.target.files[0]) {
+        selectedFile = e.target.files[0];
+        document.getElementById('dropText').textContent = selectedFile.name;
+        document.getElementById('dropText').className = 'selected-file';
+        checkUploadReady();
+    }
+});
+
+// Project name input
+document.getElementById('projectName').addEventListener('input', checkUploadReady);
+
+// Drag and drop
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('drag-over'); });
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && (file.type === 'application/pdf' || file.name.endsWith('.pdf'))) {
+        selectedFile = file;
+        document.getElementById('dropText').textContent = file.name;
+        document.getElementById('dropText').className = 'selected-file';
+        checkUploadReady();
+    }
+});
+
+// Upload
+async function uploadProject() {
+    const name = document.getElementById('projectName').value.trim();
+    if (!name || !selectedFile) return;
+
+    const btn = document.getElementById('btnUpload');
+    btn.disabled = true;
+    btn.classList.add('loading');
+
+    try {
+        const form = new FormData();
+        form.append('project_name', name);
+        form.append('file', selectedFile);
+
+        const result = await api('/projects/upload', { method: 'POST', body: form });
+        closeModal();
+        await loadProjects();
+        await loadProject(result.project_id);
+    } catch (e) {
+        alert('Upload failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+    }
+}
+
+// Close modal on overlay click
+document.getElementById('modalOverlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeModal();
+});
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+loadProjects();
+</script>
+
+</body>
+</html>
