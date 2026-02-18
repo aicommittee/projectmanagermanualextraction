@@ -41,8 +41,7 @@ Edit `.env` and fill in:
 ```bash
 cd ati-manual-finder
 source .venv/bin/activate
-cd app
-python -m uvicorn main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
 Open [http://localhost:8000](http://localhost:8000)
