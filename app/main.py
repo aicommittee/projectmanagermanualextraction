@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import os
 import threading
 from datetime import datetime, timezone
@@ -20,6 +21,12 @@ from .pdf_parser import parse_products_from_pdf
 # Load environment variables early
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("ati")
+
 app = FastAPI(title="ATI Manual Finder")
 
 # ---------------------------------------------------------------------------
@@ -37,73 +44,97 @@ def _process_project(project_id: str, total: int):
     try:
         items = db.get_project_items(project_id)
         pending = [i for i in items if i["status"] == "pending"]
+        logger.info("Starting processing for project %s — %d items", project_id, len(pending))
 
         for idx, item in enumerate(pending, 1):
+            brand = item.get("brand", "")
+            model = item["model_number"]
+            name = item.get("product_name", "")
+
             _progress[project_id] = {
-                "message": f"Searching {idx}/{total}: {item.get('brand', '')} {item['model_number']}",
+                "message": f"Searching {idx}/{total}: {brand} {model}",
                 "done": False,
                 "error": None,
             }
 
-            model = item["model_number"]
+            try:
+                # Check product library cache first
+                cached = db.get_product_by_model(model)
+                if cached and cached.get("manual_source_url"):
+                    logger.info("[%d/%d] Cache hit: %s %s", idx, total, brand, model)
+                    manual_url = None
+                    if cached.get("manual_storage_path"):
+                        try:
+                            manual_url = db.get_manual_url(cached["manual_storage_path"])
+                        except Exception:
+                            manual_url = cached.get("manual_source_url")
 
-            # Check product library cache first
-            cached = db.get_product_by_model(model)
-            if cached and cached.get("manual_source_url"):
+                    db.update_project_item(item["id"], {
+                        "product_id": cached["id"],
+                        "status": "found",
+                        "manual_url": manual_url or cached.get("manual_source_url"),
+                    })
+                    continue
+
+                # Web search
+                logger.info("[%d/%d] Searching web: %s %s", idx, total, brand, model)
+                result = find_manual_and_warranty(brand, model, name)
+                logger.info(
+                    "[%d/%d] Result: status=%s, manual_url=%s, warranty=%s",
+                    idx, total, result["status"],
+                    result.get("manual_source_url", "none"),
+                    result.get("warranty_length", "none"),
+                )
+
+                storage_path = None
                 manual_url = None
-                if cached.get("manual_storage_path"):
+
+                if result["manual_pdf_bytes"]:
+                    safe_brand = (brand or "unknown").replace(" ", "_")
+                    storage_path = f"{project_id}/{safe_brand}_{model}_manual.pdf"
                     try:
-                        manual_url = db.get_manual_url(cached["manual_storage_path"])
-                    except Exception:
-                        manual_url = cached.get("manual_source_url")
+                        db.upload_manual(result["manual_pdf_bytes"], storage_path)
+                        manual_url = db.get_manual_url(storage_path)
+                        logger.info("[%d/%d] Uploaded manual to storage: %s", idx, total, storage_path)
+                    except Exception as e:
+                        logger.warning("[%d/%d] Storage upload failed: %s", idx, total, e)
+                        manual_url = result.get("manual_source_url")
 
-                db.update_project_item(item["id"], {
-                    "product_id": cached["id"],
-                    "status": "found",
-                    "manual_url": manual_url or cached.get("manual_source_url"),
+                # Upsert product library
+                product = db.upsert_product({
+                    "brand": brand,
+                    "model_number": model,
+                    "product_name": name,
+                    "manual_source_url": result.get("manual_source_url"),
+                    "manual_storage_path": storage_path,
+                    "warranty_length": result.get("warranty_length"),
+                    "last_verified": datetime.now(timezone.utc).isoformat(),
                 })
-                continue
 
-            # Web search
-            result = find_manual_and_warranty(
-                item.get("brand", ""),
-                model,
-                item.get("product_name", ""),
-            )
+                # Update project item
+                update_data = {
+                    "status": result["status"],
+                    "manual_url": manual_url or result.get("manual_source_url"),
+                }
+                if product.get("id"):
+                    update_data["product_id"] = product["id"]
+                db.update_project_item(item["id"], update_data)
 
-            storage_path = None
-            manual_url = None
-
-            if result["manual_pdf_bytes"]:
-                safe_brand = (item.get("brand") or "unknown").replace(" ", "_")
-                storage_path = f"{project_id}/{safe_brand}_{model}_manual.pdf"
+            except Exception as e:
+                logger.error("[%d/%d] Failed to process %s %s: %s", idx, total, brand, model, e, exc_info=True)
                 try:
-                    db.upload_manual(result["manual_pdf_bytes"], storage_path)
-                    manual_url = db.get_manual_url(storage_path)
+                    db.update_project_item(item["id"], {
+                        "status": "not_found",
+                        "notes": f"Error: {e}",
+                    })
                 except Exception:
-                    manual_url = result.get("manual_source_url")
-
-            # Upsert product library
-            product = db.upsert_product({
-                "brand": item.get("brand"),
-                "model_number": model,
-                "product_name": item.get("product_name"),
-                "manual_source_url": result.get("manual_source_url"),
-                "manual_storage_path": storage_path,
-                "warranty_length": result.get("warranty_length"),
-                "last_verified": datetime.now(timezone.utc).isoformat(),
-            })
-
-            # Update project item
-            db.update_project_item(item["id"], {
-                "product_id": product["id"],
-                "status": result["status"],
-                "manual_url": manual_url or result.get("manual_source_url"),
-            })
+                    pass
 
         _progress[project_id] = {"message": "Complete!", "done": True, "error": None}
+        logger.info("Processing complete for project %s", project_id)
 
     except Exception as e:
+        logger.error("Worker crashed for project %s: %s", project_id, e, exc_info=True)
         _progress[project_id] = {"message": str(e), "done": True, "error": str(e)}
 
 
@@ -128,9 +159,11 @@ async def upload_project(
     file: UploadFile = File(...),
 ):
     pdf_bytes = await file.read()
+    logger.info("Uploading project '%s', PDF size: %d bytes", project_name, len(pdf_bytes))
 
     # Parse products from PDF
     products = parse_products_from_pdf(pdf_bytes)
+    logger.info("Extracted %d products from PDF", len(products))
 
     # Create project
     project = db.create_project(name=project_name)
@@ -201,9 +234,11 @@ async def retry_item(item_id: str):
     # Fetch the item to get brand/model/product_name
     sb = db.get_client()
     resp = sb.table("project_items").select("*").eq("id", item_id).maybe_single().execute()
-    item = resp.data
-    if not item:
+    if resp is None or not resp.data:
         raise HTTPException(status_code=404, detail="Item not found")
+    item = resp.data
+
+    logger.info("Retrying item: %s %s", item.get("brand", ""), item["model_number"])
 
     result = find_manual_and_warranty(
         item.get("brand", ""),
@@ -233,12 +268,14 @@ async def retry_item(item_id: str):
         "last_verified": datetime.now(timezone.utc).isoformat(),
     })
 
-    updated = db.update_project_item(item_id, {
-        "product_id": product["id"],
+    update_data = {
         "status": result["status"],
         "manual_url": manual_url or result.get("manual_source_url"),
-    })
+    }
+    if product.get("id"):
+        update_data["product_id"] = product["id"]
 
+    updated = db.update_project_item(item_id, update_data)
     return updated
 
 

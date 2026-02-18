@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import io
+import logging
 import os
 
 from dotenv import load_dotenv
 from supabase import create_client, Client
+
+logger = logging.getLogger(__name__)
 
 _client: Client | None = None
 
@@ -36,12 +39,14 @@ def create_project(name: str, contract_pdf_path: str | None = None) -> dict:
 def list_projects() -> list[dict]:
     sb = get_client()
     resp = sb.table("projects").select("*").order("created_at", desc=True).execute()
-    return resp.data
+    return resp.data or []
 
 
 def get_project(project_id: str) -> dict | None:
     sb = get_client()
     resp = sb.table("projects").select("*").eq("id", project_id).maybe_single().execute()
+    if resp is None:
+        return None
     return resp.data
 
 
@@ -58,6 +63,8 @@ def get_product_by_model(model_number: str) -> dict | None:
     sb = get_client()
     model_number = model_number.strip().upper()
     resp = sb.table("products").select("*").eq("model_number", model_number).maybe_single().execute()
+    if resp is None:
+        return None
     return resp.data
 
 
@@ -65,6 +72,9 @@ def upsert_product(data: dict) -> dict:
     sb = get_client()
     data["model_number"] = data["model_number"].strip().upper()
     resp = sb.table("products").upsert(data, on_conflict="model_number").execute()
+    if resp is None or not resp.data:
+        logger.error("upsert_product returned no data for %s", data.get("model_number"))
+        return data
     return resp.data[0]
 
 
@@ -78,7 +88,7 @@ def create_project_items(items: list[dict]) -> list[dict]:
         if "model_number" in item and item["model_number"]:
             item["model_number"] = item["model_number"].strip().upper()
     resp = sb.table("project_items").insert(items).execute()
-    return resp.data
+    return resp.data or []
 
 
 def get_project_items(project_id: str) -> list[dict]:
@@ -90,12 +100,15 @@ def get_project_items(project_id: str) -> list[dict]:
         .order("created_at")
         .execute()
     )
-    return resp.data
+    return resp.data or []
 
 
 def update_project_item(item_id: str, data: dict) -> dict:
     sb = get_client()
     resp = sb.table("project_items").update(data).eq("id", item_id).execute()
+    if resp is None or not resp.data:
+        logger.error("update_project_item returned no data for %s", item_id)
+        return data
     return resp.data[0]
 
 
@@ -116,4 +129,7 @@ def upload_manual(pdf_bytes: bytes, storage_path: str) -> str:
 def get_manual_url(storage_path: str) -> str:
     sb = get_client()
     resp = sb.storage.from_("manuals").create_signed_url(storage_path, 365 * 24 * 60 * 60)
-    return resp["signedURL"]
+    # Handle both possible key names from different SDK versions
+    if isinstance(resp, dict):
+        return resp.get("signedURL") or resp.get("signedUrl") or ""
+    return ""

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 from urllib.parse import urlparse, parse_qs, unquote, urljoin
@@ -7,6 +8,8 @@ from urllib.parse import urlparse, parse_qs, unquote, urljoin
 import requests
 from anthropic import Anthropic
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger("ati.search")
 
 _HEADERS = {
     "User-Agent": (
@@ -47,7 +50,8 @@ def _search_duckduckgo(query: str) -> list[str]:
             timeout=15,
         )
         resp.raise_for_status()
-    except Exception:
+    except Exception as e:
+        logger.warning("DuckDuckGo search failed for '%s': %s", query, e)
         return []
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -71,6 +75,7 @@ def _search_duckduckgo(query: str) -> list[str]:
             seen.add(u)
             unique.append(u)
 
+    logger.info("  DDG search '%s' → %d results", query[:60], len(unique))
     return unique[:10]
 
 
@@ -79,7 +84,8 @@ def _fetch_page_text(url: str) -> str:
     try:
         resp = requests.get(url, headers=_HEADERS, timeout=15)
         resp.raise_for_status()
-    except Exception:
+    except Exception as e:
+        logger.debug("  Failed to fetch %s: %s", url[:80], e)
         return ""
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -95,13 +101,15 @@ def _try_download_pdf(url: str) -> bytes | None:
         resp = requests.get(url, headers=_HEADERS, timeout=30, stream=True)
         content_type = resp.headers.get("Content-Type", "")
         if "pdf" in content_type.lower():
+            logger.info("  Downloaded PDF (%d bytes) from %s", len(resp.content), url[:80])
             return resp.content
         # Also check for PDF magic bytes as fallback
         content = resp.content
         if content[:5] == b"%PDF-":
+            logger.info("  Downloaded PDF via magic bytes (%d bytes) from %s", len(content), url[:80])
             return content
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("  PDF download failed for %s: %s", url[:80], e)
     return None
 
 
@@ -109,30 +117,35 @@ def _extract_warranty_with_claude(
     brand: str, model: str, product_name: str, page_text: str
 ) -> str | None:
     """Use Claude Haiku to extract warranty info from page text."""
-    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=256,
-        system=(
-            "Extract warranty info from product page text.\n"
-            "Return ONLY the duration as a short string like "
-            "'1 Year Limited', '2 Years', 'Limited Lifetime'.\n"
-            "If not found, return exactly: NOT FOUND"
-        ),
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    f"Brand: {brand}\nModel: {model}\n"
-                    f"Product: {product_name}\n\nPage text:\n{page_text}"
-                ),
-            }
-        ],
-    )
-    result = response.content[0].text.strip()
-    if result == "NOT FOUND":
+    try:
+        client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=256,
+            system=(
+                "Extract warranty info from product page text.\n"
+                "Return ONLY the duration as a short string like "
+                "'1 Year Limited', '2 Years', 'Limited Lifetime'.\n"
+                "If not found, return exactly: NOT FOUND"
+            ),
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"Brand: {brand}\nModel: {model}\n"
+                        f"Product: {product_name}\n\nPage text:\n{page_text}"
+                    ),
+                }
+            ],
+        )
+        result = response.content[0].text.strip()
+        if result == "NOT FOUND":
+            return None
+        logger.info("  Warranty found: %s", result)
+        return result
+    except Exception as e:
+        logger.warning("  Warranty extraction failed: %s", e)
         return None
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +166,7 @@ def find_manual_and_warranty(
             "status": "found" | "not_found",
         }
     """
+    logger.info("Searching for: %s %s", brand, model)
     manual_pdf_bytes: bytes | None = None
     manual_source_url: str | None = None
     warranty_length: str | None = None
@@ -165,6 +179,7 @@ def find_manual_and_warranty(
     # Check for direct PDF URLs in results
     for url in search_urls:
         if url.lower().endswith(".pdf"):
+            logger.info("  Trying direct PDF: %s", url[:80])
             pdf_bytes = _try_download_pdf(url)
             if pdf_bytes:
                 manual_pdf_bytes = pdf_bytes
@@ -174,6 +189,7 @@ def find_manual_and_warranty(
 
     # If no direct PDF, scrape result pages for embedded PDF links
     if manual_pdf_bytes is None:
+        logger.info("  No direct PDF found, scanning result pages...")
         for url in search_urls[:5]:
             try:
                 resp = requests.get(url, headers=_HEADERS, timeout=15)
@@ -187,6 +203,7 @@ def find_manual_and_warranty(
                             for kw in ["manual", "guide", model.lower()]
                         ):
                             abs_url = urljoin(url, href) if not href.startswith("http") else href
+                            logger.info("  Trying embedded PDF: %s", abs_url[:80])
                             pdf_bytes = _try_download_pdf(abs_url)
                             if pdf_bytes:
                                 manual_pdf_bytes = pdf_bytes
@@ -199,6 +216,7 @@ def find_manual_and_warranty(
             time.sleep(1)
 
     # --- Step 2: Search for warranty ---
+    logger.info("  Searching for warranty info...")
     warranty_query = f"{brand} {model} warranty"
     warranty_urls = _search_duckduckgo(warranty_query)
     time.sleep(1)
@@ -214,6 +232,8 @@ def find_manual_and_warranty(
         time.sleep(1)
 
     status = "found" if manual_pdf_bytes else "not_found"
+    logger.info("  Result: %s (manual=%s, warranty=%s)",
+                status, "yes" if manual_pdf_bytes else "no", warranty_length or "none")
 
     return {
         "manual_pdf_bytes": manual_pdf_bytes,
