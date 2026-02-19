@@ -96,21 +96,17 @@ def _process_project(project_id: str, total: int):
                         except Exception:
                             pass
 
-                    # Partial cache — re-search but carry over warranty
+                    # Partial cache — re-search
                     logger.info("[%d/%d] Partial cache (re-searching): %s %s", idx, total, brand, model)
                     db.update_project_item(item["id"], link_data)
 
                 # Web search
                 logger.info("[%d/%d] Searching web: %s %s", idx, total, brand, model)
-                existing_warranty = cached.get("warranty_length") if cached else None
                 result = find_manual_and_warranty(brand, model, name)
-                if existing_warranty and not result.get("warranty_length"):
-                    result["warranty_length"] = existing_warranty
                 logger.info(
-                    "[%d/%d] Result: status=%s, manual_url=%s, warranty=%s",
+                    "[%d/%d] Result: status=%s, manual_url=%s",
                     idx, total, result["status"],
                     result.get("manual_source_url", "none"),
-                    result.get("warranty_length", "none"),
                 )
 
                 storage_path = None
@@ -134,7 +130,6 @@ def _process_project(project_id: str, total: int):
                     "product_name": name,
                     "manual_source_url": manual_url or result.get("manual_source_url"),
                     "manual_storage_path": storage_path,
-                    "warranty_length": result.get("warranty_length"),
                     "last_verified": datetime.now(timezone.utc).isoformat(),
                 })
 
@@ -257,6 +252,25 @@ async def get_me(user: dict = Depends(get_current_user)):
     }
 
 
+@app.post("/api/auth/change-password")
+async def change_password(data: dict, user: dict = Depends(get_current_user)):
+    current_password = data.get("current_password", "")
+    new_password = data.get("new_password", "")
+
+    if not current_password or not new_password:
+        raise HTTPException(status_code=400, detail="Current and new password are required")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+
+    full_user = db.get_user_by_id(user["id"])
+    if not full_user or not verify_password(current_password, full_user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    new_hash = hash_password(new_password)
+    db.update_user(user["id"], {"password_hash": new_hash})
+    return {"status": "ok", "message": "Password updated successfully"}
+
+
 # ---------------------------------------------------------------------------
 # Admin user management (require admin role)
 # ---------------------------------------------------------------------------
@@ -283,6 +297,24 @@ async def admin_delete_user(user_id: str, user: dict = Depends(require_admin)):
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     db.delete_user(user_id)
     return {"status": "deleted"}
+
+
+@app.post("/api/admin/users/{user_id}/reset-password")
+async def admin_reset_password(user_id: str, data: dict, user: dict = Depends(require_admin)):
+    if user_id == user["id"]:
+        raise HTTPException(status_code=400, detail="Use Change Password for your own account")
+
+    new_password = data.get("new_password", "")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    target = db.get_user_by_id(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_hash = hash_password(new_password)
+    db.update_user(user_id, {"password_hash": new_hash})
+    return {"status": "ok", "message": "Password reset successfully"}
 
 
 # ---------------------------------------------------------------------------
@@ -483,9 +515,6 @@ def _download_manual_from_url(
 
 @app.patch("/api/items/{item_id}")
 async def update_item(item_id: str, data: dict, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
-    # Extract warranty_length — it belongs on the products table, not project_items
-    warranty_length = data.pop("warranty_length", None)
-
     # If manual_url is provided, set status to manual_entry
     if "manual_url" in data and data["manual_url"]:
         data.setdefault("status", "manual_entry")
@@ -495,7 +524,7 @@ async def update_item(item_id: str, data: dict, background_tasks: BackgroundTask
 
     # Also update the products table (cache) so future projects get a cache hit
     manual_url = data.get("manual_url")
-    if manual_url or warranty_length:
+    if manual_url:
         sb = db.get_client()
         resp = sb.table("project_items").select("*").eq("id", item_id).maybe_single().execute()
         if resp and resp.data:
@@ -506,12 +535,9 @@ async def update_item(item_id: str, data: dict, background_tasks: BackgroundTask
                     "model_number": model_number,
                     "brand": item.get("brand"),
                     "product_name": item.get("product_name"),
+                    "manual_source_url": manual_url,
+                    "last_verified": datetime.now(timezone.utc).isoformat(),
                 }
-                if manual_url:
-                    product_data["manual_source_url"] = manual_url
-                if warranty_length:
-                    product_data["warranty_length"] = warranty_length
-                product_data["last_verified"] = datetime.now(timezone.utc).isoformat()
 
                 product = db.upsert_product(product_data)
 
@@ -520,17 +546,16 @@ async def update_item(item_id: str, data: dict, background_tasks: BackgroundTask
                     db.update_project_item(item_id, {"product_id": product["id"]})
 
             # Trigger background PDF download from pasted URL
-            if manual_url:
-                background_tasks.add_task(
-                    _download_manual_from_url,
-                    item_id,
-                    manual_url,
-                    item.get("brand", ""),
-                    item.get("model_number", ""),
-                    item.get("project_id", ""),
-                )
+            background_tasks.add_task(
+                _download_manual_from_url,
+                item_id,
+                manual_url,
+                item.get("brand", ""),
+                item.get("model_number", ""),
+                item.get("project_id", ""),
+            )
 
-    # Return item with product join so frontend gets fresh warranty
+    # Return item with product join
     sb = db.get_client()
     final = sb.table("project_items").select("*, products(*)").eq("id", item_id).maybe_single().execute()
     return final.data if final and final.data else updated_item
@@ -571,7 +596,6 @@ async def retry_item(item_id: str, user: dict = Depends(get_current_user)):
         "product_name": item.get("product_name"),
         "manual_source_url": manual_url or result.get("manual_source_url"),
         "manual_storage_path": storage_path,
-        "warranty_length": result.get("warranty_length"),
         "last_verified": datetime.now(timezone.utc).isoformat(),
     })
 
@@ -729,8 +753,8 @@ async def export_excel(project_id: str, ids: str | None = None, user: dict = Dep
     navy_fill = PatternFill(start_color="1A3A5C", end_color="1A3A5C", fill_type="solid")
     white_bold = Font(bold=True, color="FFFFFF")
 
-    headers = ["Brand", "Model Number", "Product Name", "Warranty", "Manual Link", "Status", "Notes"]
-    widths = [15, 22, 45, 20, 20, 15, 30]
+    headers = ["Brand", "Model Number", "Product Name", "Manual Link", "Status", "Notes"]
+    widths = [15, 22, 45, 20, 15, 30]
 
     for col_idx, (header, width) in enumerate(zip(headers, widths), 1):
         cell = ws1.cell(row=1, column=col_idx, value=header)
@@ -750,23 +774,18 @@ async def export_excel(project_id: str, ids: str | None = None, user: dict = Dep
         ws1.cell(row=row_idx, column=2, value=item.get("model_number"))
         ws1.cell(row=row_idx, column=3, value=item.get("product_name"))
 
-        # Warranty from linked product
-        product = item.get("products")
-        warranty = product.get("warranty_length") if product else None
-        ws1.cell(row=row_idx, column=4, value=warranty)
-
         # Manual link as hyperlink
         manual_url = item.get("manual_url")
         if manual_url:
-            cell = ws1.cell(row=row_idx, column=5, value="Open Manual")
+            cell = ws1.cell(row=row_idx, column=4, value="Open Manual")
             cell.hyperlink = manual_url
             cell.font = Font(color="0563C1", underline="single")
         else:
-            ws1.cell(row=row_idx, column=5, value="")
+            ws1.cell(row=row_idx, column=4, value="")
 
         # Status with color
         status = item.get("status", "pending")
-        status_cell = ws1.cell(row=row_idx, column=6, value=status)
+        status_cell = ws1.cell(row=row_idx, column=5, value=status)
         if status in status_colors:
             status_cell.fill = PatternFill(
                 start_color=status_colors[status],
@@ -774,7 +793,7 @@ async def export_excel(project_id: str, ids: str | None = None, user: dict = Dep
                 fill_type="solid",
             )
 
-        ws1.cell(row=row_idx, column=7, value=item.get("notes"))
+        ws1.cell(row=row_idx, column=6, value=item.get("notes"))
 
     # --- Sheet 2: Needs Manual Lookup ---
     ws2 = wb.create_sheet("Needs Manual Lookup")
@@ -782,7 +801,7 @@ async def export_excel(project_id: str, ids: str | None = None, user: dict = Dep
 
     headers2 = [
         "Brand", "Model Number", "Product Name",
-        "Manual URL (paste here)", "Warranty (enter here)", "Notes",
+        "Manual URL (paste here)", "Notes",
     ]
     for col_idx, header in enumerate(headers2, 1):
         cell = ws2.cell(row=1, column=col_idx, value=header)
@@ -793,7 +812,7 @@ async def export_excel(project_id: str, ids: str | None = None, user: dict = Dep
         ws2.cell(row=row_idx, column=1, value=item.get("brand"))
         ws2.cell(row=row_idx, column=2, value=item.get("model_number"))
         ws2.cell(row=row_idx, column=3, value=item.get("product_name"))
-        # Columns 4, 5, 6 left blank for user to fill in
+        # Columns 4, 5 left blank for user to fill in
 
     # Save to buffer
     buffer = io.BytesIO()

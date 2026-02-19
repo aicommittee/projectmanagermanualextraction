@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS products (
     product_name        TEXT,
     manual_source_url   TEXT,
     manual_storage_path TEXT,
-    warranty_length     TEXT,
     last_verified       TIMESTAMPTZ,
     created_at          TIMESTAMPTZ DEFAULT NOW()
 );

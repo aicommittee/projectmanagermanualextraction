@@ -7,7 +7,6 @@ import time
 from urllib.parse import urlparse, parse_qs, unquote, urljoin
 
 import requests
-from anthropic import Anthropic
 from bs4 import BeautifulSoup
 from openai import OpenAI
 
@@ -161,41 +160,6 @@ def _try_download_pdf(url: str) -> bytes | None:
     return None
 
 
-def _extract_warranty_with_claude(
-    brand: str, model: str, product_name: str, page_text: str
-) -> str | None:
-    """Use Claude Haiku to extract warranty info from page text."""
-    try:
-        client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=256,
-            system=(
-                "Extract warranty info from product page text.\n"
-                "Return ONLY the duration as a short string like "
-                "'1 Year Limited', '2 Years', 'Limited Lifetime'.\n"
-                "If not found, return exactly: NOT FOUND"
-            ),
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"Brand: {brand}\nModel: {model}\n"
-                        f"Product: {product_name}\n\nPage text:\n{page_text}"
-                    ),
-                }
-            ],
-        )
-        result = response.content[0].text.strip()
-        if result == "NOT FOUND":
-            return None
-        logger.info("  Warranty found: %s", result)
-        return result
-    except Exception as e:
-        logger.warning("  Warranty extraction failed: %s", e)
-        return None
-
-
 # ---------------------------------------------------------------------------
 # Perplexity API (primary search when configured)
 # ---------------------------------------------------------------------------
@@ -306,55 +270,6 @@ def _search_perplexity_for_manual(
         return {"manual_url": None, "manual_pdf_bytes": None}
 
 
-def _search_perplexity_for_warranty(
-    brand: str, model: str, product_name: str
-) -> str | None:
-    """
-    Use Perplexity Sonar to find warranty length for a product.
-
-    Returns: warranty string like "2 Year Limited" or None.
-    """
-    client = _get_perplexity_client()
-    if client is None:
-        return None
-
-    prompt = (
-        f"What is the manufacturer warranty length for the {brand} {model} "
-        f"({product_name})?\n\n"
-        f"Return ONLY the warranty duration as a short string like "
-        f"'1 Year Limited', '2 Years', 'Limited Lifetime', "
-        f"'5 Year Parts and Labor'.\n"
-        f"If you cannot find warranty information, respond with exactly: NOT FOUND"
-    )
-
-    try:
-        logger.info("  Perplexity warranty search for %s %s", brand, model)
-        response = client.chat.completions.create(
-            model="sonar-pro",
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = (response.choices[0].message.content or "").strip()
-
-        if "NOT FOUND" in text.upper():
-            logger.info("  Perplexity warranty: not found")
-            return None
-
-        # Extract first meaningful line (skip any preamble)
-        lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
-        result = lines[0] if lines else text
-        # Clean up — remove any markdown or extra formatting
-        result = re.sub(r"[\*\#\`]", "", result).strip()
-        # Limit to reasonable length
-        if len(result) > 80:
-            result = result[:80]
-        logger.info("  Perplexity warranty found: %s", result)
-        return result
-
-    except Exception as e:
-        logger.warning("  Perplexity warranty search failed: %s", e)
-        return None
-
-
 # ---------------------------------------------------------------------------
 # Search query builder (DuckDuckGo fallback)
 # ---------------------------------------------------------------------------
@@ -414,32 +329,27 @@ def find_manual_and_warranty(
     brand: str, model: str, product_name: str
 ) -> dict:
     """
-    Search the web for a product's manual PDF and warranty length.
+    Search the web for a product's manual PDF.
 
     Returns:
         {
             "manual_pdf_bytes": bytes | None,
             "manual_source_url": str | None,
-            "warranty_length": str | None,
             "status": "found" | "not_found",
         }
     """
     logger.info("Searching for: %s %s", brand, model)
     manual_pdf_bytes: bytes | None = None
     manual_source_url: str | None = None
-    warranty_length: str | None = None
 
     # --- Step 1: Try Perplexity first (if configured) ---
-    perplexity_available = _get_perplexity_client() is not None
-
-    if perplexity_available:
+    if _get_perplexity_client() is not None:
         logger.info("  Using Perplexity API for manual search...")
         pplx_result = _search_perplexity_for_manual(brand, model, product_name)
         if pplx_result["manual_pdf_bytes"]:
             manual_pdf_bytes = pplx_result["manual_pdf_bytes"]
             manual_source_url = pplx_result["manual_url"]
         elif pplx_result["manual_url"]:
-            # Perplexity found a URL but couldn't download the PDF
             manual_source_url = pplx_result["manual_url"]
 
     # --- Step 2: Fall back to DuckDuckGo if no PDF found ---
@@ -484,35 +394,12 @@ def find_manual_and_warranty(
                     break
                 time.sleep(1)
 
-    # --- Step 3: Search for warranty (Perplexity first, then DDG + Claude Haiku) ---
-    if perplexity_available:
-        logger.info("  Using Perplexity for warranty search...")
-        warranty_length = _search_perplexity_for_warranty(brand, model, product_name)
-
-    if not warranty_length:
-        logger.info("  Using DDG + Claude Haiku for warranty search...")
-        warranty_query = f"{brand} {model} warranty"
-        warranty_urls = _search_duckduckgo(warranty_query)
-        time.sleep(1)
-
-        for url in warranty_urls[:3]:
-            page_text = _fetch_page_text(url)
-            if page_text:
-                warranty_length = _extract_warranty_with_claude(
-                    brand, model, product_name, page_text
-                )
-                if warranty_length:
-                    break
-            time.sleep(1)
-
     status = "found" if manual_pdf_bytes else "not_found"
-    logger.info("  Result: %s (manual=%s, warranty=%s)",
-                status, "yes" if manual_pdf_bytes else "no", warranty_length or "none")
+    logger.info("  Result: %s (manual=%s)", status, "yes" if manual_pdf_bytes else "no")
 
     return {
         "manual_pdf_bytes": manual_pdf_bytes,
         "manual_source_url": manual_source_url,
-        "warranty_length": warranty_length,
         "status": status,
     }
 

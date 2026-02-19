@@ -1,6 +1,6 @@
 # ATI Manual Finder
 
-A local web app for ATI of America's project management team. Upload an AV project contract PDF, automatically find product manuals and warranty info, and export a formatted Excel handoff package.
+A local web app for ATI of America's project management team. Upload an AV project contract PDF, automatically find product manuals, and export a formatted Excel handoff package.
 
 ## One-Time Setup
 

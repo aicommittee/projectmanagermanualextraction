@@ -134,8 +134,6 @@
         .btn-save:hover { background: #1D4ED8; }
         .btn-retry { background: #F3F4F6; color: #6B7280; border: 1px solid #D1D5DB !important; }
         .btn-retry:hover { background: #E5E7EB; }
-        .btn-edit-warranty { background: none; border: none; cursor: pointer; font-size: 12px; color: #9CA3AF; padding: 2px 4px; }
-        .btn-edit-warranty:hover { color: #2563EB; }
 
         /* Sidebar admin button */
         .sidebar-divider { border-top: 1px solid rgba(255,255,255,0.1); margin: 8px 16px; }
@@ -244,7 +242,7 @@
 <div class="auth-screen" id="authScreen">
     <div class="auth-card">
         <h1>ATI Manual Finder</h1>
-        <div class="auth-subtitle">Product Manual & Warranty Tool</div>
+        <div class="auth-subtitle">Product Manual Finder Tool</div>
 
         <div class="auth-tabs">
             <div class="auth-tab active" id="loginTab" onclick="showAuthTab('login')">Log In</div>
@@ -260,6 +258,12 @@
             <input type="email" id="loginEmail" placeholder="you@atiofamerica.com">
             <label for="loginPassword">Password</label>
             <input type="password" id="loginPassword" placeholder="Enter your password">
+            <div style="text-align:right;margin:-8px 0 12px;">
+                <a onclick="showForgotPassword()" style="font-size:13px;color:#2563EB;cursor:pointer;">Forgot Password?</a>
+            </div>
+            <div id="forgotPasswordNotice" style="display:none;background:#FEF3C7;border:1px solid #F59E0B;border-radius:6px;padding:12px;margin-bottom:12px;font-size:13px;color:#92400E;">
+                Contact your administrator to reset your password.
+            </div>
             <button class="auth-btn" id="loginBtn" onclick="login()">Log In</button>
             <div class="auth-switch">Don't have an account? <a onclick="showAuthTab('register')">Register</a></div>
         </div>
@@ -284,10 +288,11 @@
 <aside class="sidebar">
     <div class="sidebar-header">
         <h1>ATI Manual Finder</h1>
-        <p>Product Manual &amp; Warranty Tool</p>
+        <p>Product Manual Finder Tool</p>
         <div class="user-info" id="userInfo" style="display:none;">
             <span class="user-name" id="userName"></span>
             <span class="role-badge" id="userRole"></span>
+            <button class="logout-btn" onclick="openChangePasswordModal()">Password</button>
             <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
     </div>
@@ -353,8 +358,6 @@
             <p id="prodUploadText">Click to select a PDF file</p>
         </div>
         <input type="file" id="prodFileInput" accept=".pdf" style="display:none">
-        <label for="prodWarranty">Warranty</label>
-        <input type="text" id="prodWarranty" placeholder="e.g. 3 Year Limited">
         <div class="modal-actions">
             <button class="btn-cancel" onclick="closeAddProductModal()">Cancel</button>
             <button class="btn-upload" id="btnSaveProduct" onclick="saveProductFromModal()">Save Product</button>
@@ -386,6 +389,44 @@
         <div class="download-status" id="downloadStatus">Preparing download...</div>
         <div class="download-progress-bar"><div class="download-progress-fill" id="downloadFill" style="width:0%"></div></div>
         <div class="download-count" id="downloadCount"></div>
+    </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal-overlay" id="changePasswordOverlay">
+    <div class="modal">
+        <h3>Change Password</h3>
+        <div class="auth-error" id="cpError" style="display:none;"></div>
+        <div class="auth-success" id="cpSuccess" style="display:none;"></div>
+        <label for="cpCurrent">Current Password</label>
+        <input type="password" id="cpCurrent" placeholder="Enter current password" style="width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:6px;font-size:14px;margin-bottom:16px;">
+        <label for="cpNew">New Password</label>
+        <input type="password" id="cpNew" placeholder="At least 6 characters" style="width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:6px;font-size:14px;margin-bottom:16px;">
+        <label for="cpConfirm">Confirm New Password</label>
+        <input type="password" id="cpConfirm" placeholder="Re-enter new password" style="width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:6px;font-size:14px;margin-bottom:16px;">
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeChangePasswordModal()">Cancel</button>
+            <button class="btn-upload" id="btnChangePassword" onclick="changePassword()">Change Password</button>
+        </div>
+    </div>
+</div>
+
+<!-- Admin Reset Password Modal -->
+<div class="modal-overlay" id="resetPasswordOverlay">
+    <div class="modal">
+        <h3>Reset Password</h3>
+        <input type="hidden" id="rpUserId">
+        <p style="font-size:14px;color:#374151;margin-bottom:16px;">Set a new password for <strong id="rpUserName"></strong></p>
+        <div class="auth-error" id="rpError" style="display:none;"></div>
+        <div class="auth-success" id="rpSuccess" style="display:none;"></div>
+        <label for="rpNew">New Password</label>
+        <input type="password" id="rpNew" placeholder="At least 6 characters" style="width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:6px;font-size:14px;margin-bottom:16px;">
+        <label for="rpConfirm">Confirm New Password</label>
+        <input type="password" id="rpConfirm" placeholder="Re-enter new password" style="width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:6px;font-size:14px;margin-bottom:16px;">
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeResetPasswordModal()">Cancel</button>
+            <button class="btn-upload" id="btnResetPassword" onclick="resetUserPassword()">Reset Password</button>
+        </div>
     </div>
 </div>
 
@@ -443,9 +484,15 @@ async function apiFetch(path, options = {}) {
 // ---------------------------------------------------------------------------
 // Auth: login, register, logout
 // ---------------------------------------------------------------------------
+function showForgotPassword() {
+    var el = document.getElementById('forgotPasswordNotice');
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
 function showAuthTab(tab) {
     document.getElementById('authError').style.display = 'none';
     document.getElementById('authSuccess').style.display = 'none';
+    document.getElementById('forgotPasswordNotice').style.display = 'none';
 
     if (tab === 'login') {
         document.getElementById('loginTab').classList.add('active');
@@ -745,7 +792,7 @@ function renderProjectView(items, progress) {
         html += '<th class="sortable' + (projectSortField === 'brand' ? ' sort-' + projectSortDir : '') + '" onclick="sortProjectBy(\'brand\')">Brand</th>';
         html += '<th class="sortable' + (projectSortField === 'model_number' ? ' sort-' + projectSortDir : '') + '" onclick="sortProjectBy(\'model_number\')">Model</th>';
         html += '<th class="sortable' + (projectSortField === 'product_name' ? ' sort-' + projectSortDir : '') + '" onclick="sortProjectBy(\'product_name\')">Product Name</th>';
-        html += '<th>Warranty</th><th>Manual</th><th>Status</th>';
+        html += '<th>Manual</th><th>Status</th>';
         html += '</tr></thead>';
         html += '<tbody>';
         items.forEach(function(item) {
@@ -755,7 +802,6 @@ function renderProjectView(items, progress) {
             html += '<td>' + escapeHtml(item.brand || '') + '</td>';
             html += '<td><span class="model-pill">' + escapeHtml(item.model_number || '') + '</span></td>';
             html += '<td>' + escapeHtml(item.product_name || '') + '</td>';
-            html += '<td>' + renderWarrantyCell(item) + '</td>';
             html += '<td>' + renderManualCell(item) + '</td>';
             html += '<td><span class="badge badge-' + item.status + '">' + formatStatus(item.status) + '</span></td>';
             html += '</tr>';
@@ -765,34 +811,6 @@ function renderProjectView(items, progress) {
 
     content.innerHTML = html;
     updateBulkToolbar();
-}
-
-function renderWarrantyCell(item) {
-    var product = item.products;
-    var warranty = (product && product.warranty_length) ? product.warranty_length : '';
-
-    if (item.status === 'not_found') {
-        return '<div class="inline-input">' +
-            '<input type="text" placeholder="e.g. 2 Year Limited" id="warranty-' + item.id + '" value="' + escapeHtml(warranty) + '" style="width:130px;">' +
-            '</div>';
-    }
-
-    if (item.status === 'found' || item.status === 'manual_entry') {
-        return '<span id="warranty-display-' + item.id + '">' +
-            (warranty ? escapeHtml(warranty) : '<span style="color:#9CA3AF">-</span>') +
-            '</span>' +
-            '<button class="btn-edit-warranty" onclick="editWarranty(\'' + item.id + '\', \'' + escapeHtml(warranty).replace(/'/g, "\\'") + '\')" title="Edit warranty">&#9998;</button>' +
-            '<span id="warranty-edit-' + item.id + '" style="display:none;">' +
-            '<div class="inline-input">' +
-            '<input type="text" id="warranty-input-' + item.id + '" value="' + escapeHtml(warranty) + '" style="width:130px;">' +
-            '<button class="btn-save" onclick="saveWarranty(\'' + item.id + '\')">Save</button>' +
-            '</div></span>';
-    }
-
-    if (item.status === 'pending') {
-        return '<span style="color:#9CA3AF">-</span>';
-    }
-    return '-';
 }
 
 function renderManualCell(item) {
@@ -808,7 +826,7 @@ function renderManualCell(item) {
     if (item.status === 'not_found') {
         return '<div class="inline-input">' +
             '<input type="text" placeholder="Paste manual URL" id="url-' + item.id + '">' +
-            '<button class="btn-save" onclick="saveManualUrlAndWarranty(\'' + item.id + '\')">Save</button>' +
+            '<button class="btn-save" onclick="saveManualUrl(\'' + item.id + '\')">Save</button>' +
             '<button class="btn-upload-pdf" id="upload-btn-' + item.id + '" onclick="triggerItemUpload(\'' + item.id + '\')">Upload PDF</button>' +
             '<input type="file" accept=".pdf" id="file-' + item.id + '" style="display:none" onchange="uploadItemManual(\'' + item.id + '\')">' +
             '<button class="btn-retry" onclick="retryItem(\'' + item.id + '\')">Retry</button>' +
@@ -857,24 +875,18 @@ function stopPolling() {
 }
 
 // ---------------------------------------------------------------------------
-// Save manual URL + warranty (for not_found items)
+// Save manual URL (for not_found items)
 // ---------------------------------------------------------------------------
-async function saveManualUrlAndWarranty(itemId) {
+async function saveManualUrl(itemId) {
     var urlInput = document.getElementById('url-' + itemId);
-    var warrantyInput = document.getElementById('warranty-' + itemId);
     var url = urlInput ? urlInput.value.trim() : '';
-    var warranty = warrantyInput ? warrantyInput.value.trim() : '';
 
-    if (!url && !warranty) return;
+    if (!url) return;
 
-    var payload = {};
-    if (url) {
-        payload.manual_url = url;
-        payload.status = 'manual_entry';
-    }
-    if (warranty) {
-        payload.warranty_length = warranty;
-    }
+    var payload = {
+        manual_url: url,
+        status: 'manual_entry',
+    };
 
     var btn = event.target.closest('.btn-save') || event.target;
     btn.classList.add('btn-working');
@@ -883,38 +895,6 @@ async function saveManualUrlAndWarranty(itemId) {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
-        });
-        await loadProject(currentProjectId);
-    } catch (e) {
-        alert('Save failed: ' + e.message);
-        btn.classList.remove('btn-working');
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Edit warranty (for found/manual_entry items)
-// ---------------------------------------------------------------------------
-function editWarranty(itemId, currentValue) {
-    var display = document.getElementById('warranty-display-' + itemId);
-    var edit = document.getElementById('warranty-edit-' + itemId);
-    if (display) display.style.display = 'none';
-    if (edit) edit.style.display = 'inline';
-    var input = document.getElementById('warranty-input-' + itemId);
-    if (input) input.focus();
-}
-
-async function saveWarranty(itemId) {
-    var input = document.getElementById('warranty-input-' + itemId);
-    var warranty = input ? input.value.trim() : '';
-    if (!warranty) return;
-
-    var btn = event.target.closest('button') || event.target;
-    btn.classList.add('btn-working');
-    try {
-        await api('/items/' + itemId, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ warranty_length: warranty }),
         });
         await loadProject(currentProjectId);
     } catch (e) {
@@ -1419,14 +1399,12 @@ function renderAdminView(products, searchValue) {
 
     var total = products.length;
     var withManual = products.filter(function(p) { return p.manual_source_url; }).length;
-    var withWarranty = products.filter(function(p) { return p.warranty_length; }).length;
 
     var html = '';
 
     html += '<div class="stats">';
     html += '<div class="stat-card total"><div class="label">Total Products</div><div class="value">' + total + '</div></div>';
     html += '<div class="stat-card found"><div class="label">With Manuals</div><div class="value">' + withManual + '</div></div>';
-    html += '<div class="stat-card" style=""><div class="label">With Warranty</div><div class="value" style="color:#8B5CF6;">' + withWarranty + '</div></div>';
     html += '<div class="stat-card not-found"><div class="label">Missing Manual</div><div class="value">' + (total - withManual) + '</div></div>';
     html += '</div>';
 
@@ -1441,7 +1419,7 @@ function renderAdminView(products, searchValue) {
         html += '<th class="sortable' + (adminSortField === 'brand' ? ' sort-' + adminSortDir : '') + '" onclick="sortAdminBy(\'brand\')">Brand</th>';
         html += '<th class="sortable' + (adminSortField === 'model_number' ? ' sort-' + adminSortDir : '') + '" onclick="sortAdminBy(\'model_number\')">Model</th>';
         html += '<th class="sortable' + (adminSortField === 'product_name' ? ' sort-' + adminSortDir : '') + '" onclick="sortAdminBy(\'product_name\')">Product Name</th>';
-        html += '<th>Manual URL</th><th>Warranty</th><th>Actions</th>';
+        html += '<th>Manual URL</th><th>Actions</th>';
         html += '</tr></thead>';
         html += '<tbody>';
         products.forEach(function(p) {
@@ -1454,7 +1432,6 @@ function renderAdminView(products, searchValue) {
             } else {
                 html += '<td><span style="color:#9CA3AF">-</span></td>';
             }
-            html += '<td>' + (p.warranty_length ? escapeHtml(p.warranty_length) : '<span style="color:#9CA3AF">-</span>') + '</td>';
             html += '<td><div class="admin-actions">';
             html += '<button class="btn-table-edit" onclick="openEditProductModal(\'' + p.id + '\')">Edit</button>';
             html += '<button class="btn-table-delete" onclick="deleteProductFromAdmin(\'' + p.id + '\', \'' + escapeHtml(p.model_number).replace(/'/g, "\\'") + '\')">Delete</button>';
@@ -1537,7 +1514,6 @@ function openAddProductModal() {
     document.getElementById('prodModel').value = '';
     document.getElementById('prodName').value = '';
     document.getElementById('prodManualUrl').value = '';
-    document.getElementById('prodWarranty').value = '';
     prodSelectedFile = null;
     document.getElementById('prodUploadText').textContent = 'Click to select a PDF file';
     document.getElementById('prodUploadText').className = '';
@@ -1556,7 +1532,6 @@ async function openEditProductModal(productId) {
     document.getElementById('prodModel').value = p.model_number || '';
     document.getElementById('prodName').value = p.product_name || '';
     document.getElementById('prodManualUrl').value = p.manual_source_url || '';
-    document.getElementById('prodWarranty').value = p.warranty_length || '';
     prodSelectedFile = null;
     document.getElementById('prodUploadText').textContent = 'Click to select a PDF file';
     document.getElementById('prodUploadText').className = '';
@@ -1583,7 +1558,6 @@ async function saveProductFromModal() {
         model_number: document.getElementById('prodModel').value.trim(),
         product_name: document.getElementById('prodName').value.trim(),
         manual_source_url: document.getElementById('prodManualUrl').value.trim() || null,
-        warranty_length: document.getElementById('prodWarranty').value.trim() || null,
     };
 
     if (!data.model_number) {
@@ -1724,6 +1698,7 @@ function renderUsersView(users) {
                         html += '<button class="btn-table-edit" onclick="toggleUserRole(\'' + u.id + '\', \'pm\')">Make PM</button>';
                     }
                     html += '<button class="btn-table-delete" onclick="deactivateUser(\'' + u.id + '\', \'' + escapeHtml(u.name).replace(/'/g, "\\'") + '\')">Deactivate</button>';
+                    html += '<button class="btn-table-edit" onclick="openResetPasswordModal(\'' + u.id + '\', \'' + escapeHtml(u.name).replace(/'/g, "\\'") + '\')">Reset Pwd</button>';
                 }
             } else {
                 html += '<span style="color:#9CA3AF;font-size:11px;">-</span>';
@@ -1801,6 +1776,144 @@ async function toggleUserRole(userId, newRole) {
         btn.classList.remove('btn-working');
     }
 }
+
+// ---------------------------------------------------------------------------
+// Change Password (any user)
+// ---------------------------------------------------------------------------
+function openChangePasswordModal() {
+    document.getElementById('cpCurrent').value = '';
+    document.getElementById('cpNew').value = '';
+    document.getElementById('cpConfirm').value = '';
+    document.getElementById('cpError').style.display = 'none';
+    document.getElementById('cpSuccess').style.display = 'none';
+    document.getElementById('btnChangePassword').disabled = false;
+    document.getElementById('btnChangePassword').textContent = 'Change Password';
+    document.getElementById('changePasswordOverlay').classList.add('open');
+}
+
+function closeChangePasswordModal() {
+    document.getElementById('changePasswordOverlay').classList.remove('open');
+}
+
+async function changePassword() {
+    var current = document.getElementById('cpCurrent').value;
+    var newPwd = document.getElementById('cpNew').value;
+    var confirm = document.getElementById('cpConfirm').value;
+
+    document.getElementById('cpError').style.display = 'none';
+    document.getElementById('cpSuccess').style.display = 'none';
+
+    if (!current || !newPwd) {
+        document.getElementById('cpError').textContent = 'All fields are required.';
+        document.getElementById('cpError').style.display = 'block';
+        return;
+    }
+    if (newPwd.length < 6) {
+        document.getElementById('cpError').textContent = 'New password must be at least 6 characters.';
+        document.getElementById('cpError').style.display = 'block';
+        return;
+    }
+    if (newPwd !== confirm) {
+        document.getElementById('cpError').textContent = 'New passwords do not match.';
+        document.getElementById('cpError').style.display = 'block';
+        return;
+    }
+
+    var btn = document.getElementById('btnChangePassword');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+        await api('/auth/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current_password: current, new_password: newPwd }),
+        });
+        document.getElementById('cpSuccess').textContent = 'Password changed successfully!';
+        document.getElementById('cpSuccess').style.display = 'block';
+        setTimeout(closeChangePasswordModal, 1500);
+    } catch (e) {
+        document.getElementById('cpError').textContent = e.message.replace(/^API error \d+: "?|"?$/g, '');
+        document.getElementById('cpError').style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Change Password';
+    }
+}
+
+document.getElementById('changePasswordOverlay').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) closeChangePasswordModal();
+});
+
+// ---------------------------------------------------------------------------
+// Admin Reset Password
+// ---------------------------------------------------------------------------
+function openResetPasswordModal(userId, userName) {
+    document.getElementById('rpUserId').value = userId;
+    document.getElementById('rpUserName').textContent = userName;
+    document.getElementById('rpNew').value = '';
+    document.getElementById('rpConfirm').value = '';
+    document.getElementById('rpError').style.display = 'none';
+    document.getElementById('rpSuccess').style.display = 'none';
+    document.getElementById('btnResetPassword').disabled = false;
+    document.getElementById('btnResetPassword').textContent = 'Reset Password';
+    document.getElementById('resetPasswordOverlay').classList.add('open');
+}
+
+function closeResetPasswordModal() {
+    document.getElementById('resetPasswordOverlay').classList.remove('open');
+}
+
+async function resetUserPassword() {
+    var userId = document.getElementById('rpUserId').value;
+    var newPwd = document.getElementById('rpNew').value;
+    var confirm = document.getElementById('rpConfirm').value;
+
+    document.getElementById('rpError').style.display = 'none';
+    document.getElementById('rpSuccess').style.display = 'none';
+
+    if (!newPwd) {
+        document.getElementById('rpError').textContent = 'Password is required.';
+        document.getElementById('rpError').style.display = 'block';
+        return;
+    }
+    if (newPwd.length < 6) {
+        document.getElementById('rpError').textContent = 'Password must be at least 6 characters.';
+        document.getElementById('rpError').style.display = 'block';
+        return;
+    }
+    if (newPwd !== confirm) {
+        document.getElementById('rpError').textContent = 'Passwords do not match.';
+        document.getElementById('rpError').style.display = 'block';
+        return;
+    }
+
+    var btn = document.getElementById('btnResetPassword');
+    btn.disabled = true;
+    btn.textContent = 'Resetting...';
+
+    try {
+        await api('/admin/users/' + userId + '/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_password: newPwd }),
+        });
+        document.getElementById('rpSuccess').textContent = 'Password reset successfully!';
+        document.getElementById('rpSuccess').style.display = 'block';
+        setTimeout(function() {
+            closeResetPasswordModal();
+            loadUserManagement();
+        }, 1500);
+    } catch (e) {
+        document.getElementById('rpError').textContent = e.message.replace(/^API error \d+: "?|"?$/g, '');
+        document.getElementById('rpError').style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Reset Password';
+    }
+}
+
+document.getElementById('resetPasswordOverlay').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) closeResetPasswordModal();
+});
 
 // ---------------------------------------------------------------------------
 // Utilities
