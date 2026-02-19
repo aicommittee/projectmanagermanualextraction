@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from urllib.parse import urlparse, parse_qs, unquote, urljoin
 
 import requests
 from anthropic import Anthropic
 from bs4 import BeautifulSoup
+from openai import OpenAI
 
 logger = logging.getLogger("ati.search")
 
@@ -17,6 +19,52 @@ _HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
     )
+}
+
+_MANUFACTURER_DOMAINS = {
+    "crestron": "crestron.com",
+    "savant": "savant.com",
+    "control4": "control4.com",
+    "lutron": "lutron.com",
+    "sonance": "sonance.com",
+    "samsung": "samsung.com",
+    "lg": "lg.com",
+    "sony": "sony.com",
+    "ubiquiti": "ui.com",
+    "unifi": "ui.com",
+    "wattbox": "snapone.com",
+    "snap one": "snapone.com",
+    "episode": "snapone.com",
+    "binary": "snapone.com",
+    "apple": "support.apple.com",
+    "sonos": "sonos.com",
+    "denon": "denon.com",
+    "marantz": "marantz.com",
+    "yamaha": "yamaha.com",
+    "epson": "epson.com",
+    "origin acoustics": "originacoustics.com",
+    "atlona": "atlona.com",
+    "qsc": "qsc.com",
+    "shure": "shure.com",
+    "middle atlantic": "middleatlantic.com",
+    "araknis": "araknisnetworks.com",
+    "parasound": "parasound.com",
+    "innovolt": "innovolt.com",
+    "surgex": "surgex.com",
+    "bose": "bose.com",
+    "klipsch": "klipsch.com",
+    "jbl": "jbl.com",
+    "harman": "harmanpro.com",
+    "russound": "russound.com",
+    "autonomic": "autonomic.com",
+    "seura": "seura.com",
+    "leon": "leonspeakers.com",
+    "triad": "triadspeakers.com",
+    "james loudspeaker": "jamesloudspeaker.com",
+    "just add power": "justaddpower.com",
+    "access networks": "accessnetworks.com",
+    "pakedge": "pakedge.com",
+    "ruckus": "ruckuswireless.com",
 }
 
 
@@ -149,6 +197,216 @@ def _extract_warranty_with_claude(
 
 
 # ---------------------------------------------------------------------------
+# Perplexity API (primary search when configured)
+# ---------------------------------------------------------------------------
+
+def _get_perplexity_client() -> OpenAI | None:
+    """Return a Perplexity client if API key is configured, else None."""
+    api_key = os.environ.get("PERPLEXITY_API_KEY", "").strip()
+    if not api_key:
+        return None
+    return OpenAI(api_key=api_key, base_url="https://api.perplexity.ai")
+
+
+def _search_perplexity_for_manual(
+    brand: str, model: str, product_name: str
+) -> dict:
+    """
+    Use Perplexity Sonar to find a product manual PDF URL.
+
+    Returns:
+        {"manual_url": str | None, "manual_pdf_bytes": bytes | None}
+    """
+    client = _get_perplexity_client()
+    if client is None:
+        return {"manual_url": None, "manual_pdf_bytes": None}
+
+    brand_lower = brand.strip().lower()
+    domain = _MANUFACTURER_DOMAINS.get(brand_lower)
+    domain_hint = f", preferably from {domain}" if domain else ""
+
+    prompt = (
+        f"Find the official PDF user manual download link for the {brand} {model} "
+        f"({product_name}).{domain_hint}\n\n"
+        f"I need a direct URL to the PDF file — not a product page or support page.\n"
+        f"Look for the product's user manual, installation guide, or owner's manual.\n\n"
+        f"If you find a direct PDF link, state it clearly on its own line as:\n"
+        f"PDF_URL: <the full URL>\n\n"
+        f"If you cannot find a direct PDF link, state:\n"
+        f"PDF_URL: NOT_FOUND"
+    )
+
+    try:
+        logger.info("  Perplexity manual search for %s %s", brand, model)
+        response = client.chat.completions.create(
+            model="sonar-pro",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = response.choices[0].message.content or ""
+        citations = getattr(response, "citations", []) or []
+
+        logger.info("  Perplexity returned %d citations", len(citations))
+
+        # Build candidate URLs from multiple sources
+        candidates: list[str] = []
+
+        # Source 1: Explicitly stated PDF_URL in response text
+        pdf_url_match = re.search(r"PDF_URL:\s*(https?://\S+)", text)
+        if pdf_url_match:
+            url = pdf_url_match.group(1).rstrip(")")
+            if url != "NOT_FOUND":
+                candidates.append(url)
+
+        # Source 2: Citations ending in .pdf
+        for c in citations:
+            if c.lower().endswith(".pdf"):
+                candidates.append(c)
+
+        # Source 3: Citations containing manual/guide keywords in path
+        manual_kw = ["manual", "guide", "instruction", "documentation", "user-guide"]
+        for c in citations:
+            if any(kw in c.lower() for kw in manual_kw) and c not in candidates:
+                candidates.append(c)
+
+        # Source 4: All remaining citations (lower priority)
+        for c in citations:
+            if c not in candidates:
+                candidates.append(c)
+
+        # Try downloading PDFs from candidates
+        for url in candidates:
+            logger.info("  Perplexity candidate: %s", url[:100])
+            pdf_bytes = _try_download_pdf(url)
+            if pdf_bytes:
+                return {"manual_url": url, "manual_pdf_bytes": pdf_bytes}
+            time.sleep(0.5)
+
+        # If we found URLs but couldn't download PDFs, scan pages for embedded PDF links
+        for url in candidates[:3]:
+            if url.lower().endswith(".pdf"):
+                continue  # Already tried direct download
+            page_pdfs = _scan_page_for_pdf_links(url, model)
+            for pdf_url in page_pdfs:
+                logger.info("  Perplexity page-scan candidate: %s", pdf_url[:100])
+                pdf_bytes = _try_download_pdf(pdf_url)
+                if pdf_bytes:
+                    return {"manual_url": pdf_url, "manual_pdf_bytes": pdf_bytes}
+            time.sleep(0.5)
+
+        # Return the best URL even if we couldn't download it
+        if candidates:
+            logger.info("  Perplexity found URL but PDF download failed: %s", candidates[0][:100])
+            return {"manual_url": candidates[0], "manual_pdf_bytes": None}
+
+        logger.info("  Perplexity found no manual URLs")
+        return {"manual_url": None, "manual_pdf_bytes": None}
+
+    except Exception as e:
+        logger.warning("  Perplexity manual search failed: %s", e)
+        return {"manual_url": None, "manual_pdf_bytes": None}
+
+
+def _search_perplexity_for_warranty(
+    brand: str, model: str, product_name: str
+) -> str | None:
+    """
+    Use Perplexity Sonar to find warranty length for a product.
+
+    Returns: warranty string like "2 Year Limited" or None.
+    """
+    client = _get_perplexity_client()
+    if client is None:
+        return None
+
+    prompt = (
+        f"What is the manufacturer warranty length for the {brand} {model} "
+        f"({product_name})?\n\n"
+        f"Return ONLY the warranty duration as a short string like "
+        f"'1 Year Limited', '2 Years', 'Limited Lifetime', "
+        f"'5 Year Parts and Labor'.\n"
+        f"If you cannot find warranty information, respond with exactly: NOT FOUND"
+    )
+
+    try:
+        logger.info("  Perplexity warranty search for %s %s", brand, model)
+        response = client.chat.completions.create(
+            model="sonar-pro",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = (response.choices[0].message.content or "").strip()
+
+        if "NOT FOUND" in text.upper():
+            logger.info("  Perplexity warranty: not found")
+            return None
+
+        # Extract first meaningful line (skip any preamble)
+        lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+        result = lines[0] if lines else text
+        # Clean up — remove any markdown or extra formatting
+        result = re.sub(r"[\*\#\`]", "", result).strip()
+        # Limit to reasonable length
+        if len(result) > 80:
+            result = result[:80]
+        logger.info("  Perplexity warranty found: %s", result)
+        return result
+
+    except Exception as e:
+        logger.warning("  Perplexity warranty search failed: %s", e)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Search query builder (DuckDuckGo fallback)
+# ---------------------------------------------------------------------------
+
+def _build_search_queries(brand: str, model: str, product_name: str) -> list[str]:
+    """Build an ordered list of search queries to try for finding a product manual."""
+    queries = []
+
+    # Query 1: broad manual search (no filetype: — DDG doesn't support it reliably)
+    queries.append(f"{brand} {model} user manual PDF")
+
+    # Query 2: manufacturer-specific or fallback
+    brand_lower = brand.strip().lower()
+    domain = _MANUFACTURER_DOMAINS.get(brand_lower)
+    if domain:
+        queries.append(f"site:{domain} {model} manual")
+    else:
+        queries.append(f"{model} installation manual PDF")
+
+    # Query 3: product support / documentation page
+    queries.append(f"{brand} {model} product support documentation")
+
+    return queries
+
+
+def _scan_page_for_pdf_links(page_url: str, model: str) -> list[str]:
+    """Scrape a page for links that look like manual PDFs. Returns candidate URLs."""
+    candidates: list[str] = []
+    try:
+        resp = requests.get(page_url, headers=_HEADERS, timeout=15)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        model_lower = model.lower()
+        manual_keywords = ["manual", "guide", "user guide", "instruction", "documentation"]
+
+        for a_tag in soup.find_all("a", href=True):
+            href = a_tag["href"]
+            link_text = a_tag.get_text(strip=True).lower()
+            lower_href = href.lower()
+
+            is_pdf_link = lower_href.endswith(".pdf")
+            has_manual_kw = any(kw in lower_href or kw in link_text for kw in manual_keywords)
+            has_model = model_lower in lower_href or model_lower in link_text
+
+            if is_pdf_link and (has_manual_kw or has_model):
+                abs_url = urljoin(page_url, href) if not href.startswith("http") else href
+                candidates.append(abs_url)
+    except Exception:
+        pass
+    return candidates
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -171,65 +429,81 @@ def find_manual_and_warranty(
     manual_source_url: str | None = None
     warranty_length: str | None = None
 
-    # --- Step 1: Search for manual PDF ---
-    query = f"{brand} {model} user manual filetype:pdf"
-    search_urls = _search_duckduckgo(query)
-    time.sleep(1)
+    # --- Step 1: Try Perplexity first (if configured) ---
+    perplexity_available = _get_perplexity_client() is not None
 
-    # Check for direct PDF URLs in results
-    for url in search_urls:
-        if url.lower().endswith(".pdf"):
-            logger.info("  Trying direct PDF: %s", url[:80])
-            pdf_bytes = _try_download_pdf(url)
-            if pdf_bytes:
-                manual_pdf_bytes = pdf_bytes
-                manual_source_url = url
+    if perplexity_available:
+        logger.info("  Using Perplexity API for manual search...")
+        pplx_result = _search_perplexity_for_manual(brand, model, product_name)
+        if pplx_result["manual_pdf_bytes"]:
+            manual_pdf_bytes = pplx_result["manual_pdf_bytes"]
+            manual_source_url = pplx_result["manual_url"]
+        elif pplx_result["manual_url"]:
+            # Perplexity found a URL but couldn't download the PDF
+            manual_source_url = pplx_result["manual_url"]
+
+    # --- Step 2: Fall back to DuckDuckGo if no PDF found ---
+    if not manual_pdf_bytes:
+        logger.info("  Using DuckDuckGo for manual search...")
+        queries = _build_search_queries(brand, model, product_name)
+
+        for query_idx, query in enumerate(queries):
+            if manual_pdf_bytes:
                 break
+
+            logger.info("  DDG Query %d/%d: '%s'", query_idx + 1, len(queries), query)
+            search_urls = _search_duckduckgo(query)
             time.sleep(1)
 
-    # If no direct PDF, scrape result pages for embedded PDF links
-    if manual_pdf_bytes is None:
-        logger.info("  No direct PDF found, scanning result pages...")
-        for url in search_urls[:5]:
-            try:
-                resp = requests.get(url, headers=_HEADERS, timeout=15)
-                soup = BeautifulSoup(resp.text, "html.parser")
-                for a_tag in soup.find_all("a", href=True):
-                    href = a_tag["href"]
-                    if href.lower().endswith(".pdf"):
-                        lower_href = href.lower()
-                        if any(
-                            kw in lower_href
-                            for kw in ["manual", "guide", model.lower()]
-                        ):
-                            abs_url = urljoin(url, href) if not href.startswith("http") else href
-                            logger.info("  Trying embedded PDF: %s", abs_url[:80])
-                            pdf_bytes = _try_download_pdf(abs_url)
-                            if pdf_bytes:
-                                manual_pdf_bytes = pdf_bytes
-                                manual_source_url = abs_url
-                                break
+            # Pass 1: Check for direct PDF URLs in results
+            for url in search_urls:
+                if url.lower().endswith(".pdf"):
+                    logger.info("  Trying direct PDF: %s", url[:80])
+                    pdf_bytes = _try_download_pdf(url)
+                    if pdf_bytes:
+                        manual_pdf_bytes = pdf_bytes
+                        manual_source_url = url
+                        break
+                    time.sleep(1)
+
+            if manual_pdf_bytes:
+                break
+
+            # Pass 2: Scrape result pages for embedded PDF links
+            logger.info("  No direct PDF, scanning result pages...")
+            for url in search_urls[:4]:
+                pdf_candidates = _scan_page_for_pdf_links(url, model)
+                for candidate in pdf_candidates:
+                    logger.info("  Trying candidate PDF: %s", candidate[:80])
+                    pdf_bytes = _try_download_pdf(candidate)
+                    if pdf_bytes:
+                        manual_pdf_bytes = pdf_bytes
+                        manual_source_url = candidate
+                        break
                 if manual_pdf_bytes:
                     break
-            except Exception:
-                pass
-            time.sleep(1)
+                time.sleep(1)
 
-    # --- Step 2: Search for warranty ---
-    logger.info("  Searching for warranty info...")
-    warranty_query = f"{brand} {model} warranty"
-    warranty_urls = _search_duckduckgo(warranty_query)
-    time.sleep(1)
+    # --- Step 3: Search for warranty (Perplexity first, then DDG + Claude Haiku) ---
+    if perplexity_available:
+        logger.info("  Using Perplexity for warranty search...")
+        warranty_length = _search_perplexity_for_warranty(brand, model, product_name)
 
-    for url in warranty_urls[:3]:
-        page_text = _fetch_page_text(url)
-        if page_text:
-            warranty_length = _extract_warranty_with_claude(
-                brand, model, product_name, page_text
-            )
-            if warranty_length:
-                break
+    if not warranty_length:
+        logger.info("  Using DDG + Claude Haiku for warranty search...")
+        warranty_query = f"{brand} {model} warranty"
+        warranty_urls = _search_duckduckgo(warranty_query)
         time.sleep(1)
+
+        for url in warranty_urls[:3]:
+            page_text = _fetch_page_text(url)
+            if page_text:
+                warranty_length = _extract_warranty_with_claude(
+                    brand, model, product_name, page_text
+                )
+                if warranty_length:
+                    break
+            time.sleep(1)
 
     status = "found" if manual_pdf_bytes else "not_found"
     logger.info("  Result: %s (manual=%s, warranty=%s)",
@@ -241,3 +515,30 @@ def find_manual_and_warranty(
         "warranty_length": warranty_length,
         "status": status,
     }
+
+
+def download_pdf_from_url(url: str) -> bytes | None:
+    """
+    Download a PDF from a given URL. Used when users manually paste URLs.
+    Tries direct download first, then scans the page for embedded PDF links.
+
+    Returns PDF bytes or None.
+    """
+    logger.info("  Attempting PDF download from user URL: %s", url[:100])
+
+    # Try direct download
+    pdf_bytes = _try_download_pdf(url)
+    if pdf_bytes:
+        return pdf_bytes
+
+    # URL might be an HTML page with a download link — scrape for PDF links
+    logger.info("  Direct download failed, scanning page for PDF links...")
+    page_pdfs = _scan_page_for_pdf_links(url, "")
+    for candidate in page_pdfs:
+        logger.info("  Trying page PDF link: %s", candidate[:100])
+        pdf_bytes = _try_download_pdf(candidate)
+        if pdf_bytes:
+            return pdf_bytes
+
+    logger.info("  Could not download PDF from %s", url[:100])
+    return None

@@ -24,21 +24,82 @@ def get_client() -> Client:
 
 
 # ---------------------------------------------------------------------------
-# Projects
+# Users
 # ---------------------------------------------------------------------------
 
-def create_project(name: str, contract_pdf_path: str | None = None) -> dict:
+def create_user(email: str, password_hash: str, name: str, role: str = "pm", approved: bool = False) -> dict:
     sb = get_client()
-    resp = sb.table("projects").insert({
-        "name": name,
-        "contract_pdf_path": contract_pdf_path,
+    resp = sb.table("users").insert({
+        "email": email.strip().lower(),
+        "password_hash": password_hash,
+        "name": name.strip(),
+        "role": role,
+        "approved": approved,
     }).execute()
     return resp.data[0]
 
 
-def list_projects() -> list[dict]:
+def get_user_by_email(email: str) -> dict | None:
     sb = get_client()
-    resp = sb.table("projects").select("*").order("created_at", desc=True).execute()
+    resp = sb.table("users").select("*").eq("email", email.strip().lower()).maybe_single().execute()
+    if resp is None:
+        return None
+    return resp.data
+
+
+def get_user_by_id(user_id: str) -> dict | None:
+    sb = get_client()
+    resp = sb.table("users").select("*").eq("id", user_id).maybe_single().execute()
+    if resp is None:
+        return None
+    return resp.data
+
+
+def list_users() -> list[dict]:
+    sb = get_client()
+    resp = sb.table("users").select("id, email, name, role, approved, created_at").order("created_at", desc=True).execute()
+    return resp.data or []
+
+
+def update_user(user_id: str, data: dict) -> dict:
+    sb = get_client()
+    resp = sb.table("users").update(data).eq("id", user_id).execute()
+    if resp is None or not resp.data:
+        return data
+    return resp.data[0]
+
+
+def delete_user(user_id: str):
+    sb = get_client()
+    sb.table("users").delete().eq("id", user_id).execute()
+
+
+def count_users() -> int:
+    sb = get_client()
+    resp = sb.table("users").select("id", count="exact").execute()
+    return resp.count if resp.count is not None else 0
+
+
+# ---------------------------------------------------------------------------
+# Projects
+# ---------------------------------------------------------------------------
+
+def create_project(name: str, user_id: str | None = None, contract_pdf_path: str | None = None) -> dict:
+    sb = get_client()
+    row = {"name": name, "contract_pdf_path": contract_pdf_path}
+    if user_id:
+        row["user_id"] = user_id
+    resp = sb.table("projects").insert(row).execute()
+    return resp.data[0]
+
+
+def list_projects(user_id: str | None = None) -> list[dict]:
+    sb = get_client()
+    if user_id:
+        resp = sb.table("projects").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    else:
+        # Admin view: include user info
+        resp = sb.table("projects").select("*, users(name, email)").order("created_at", desc=True).execute()
     return resp.data or []
 
 
@@ -78,6 +139,32 @@ def upsert_product(data: dict) -> dict:
     return resp.data[0]
 
 
+def list_products(search: str | None = None) -> list[dict]:
+    sb = get_client()
+    query = sb.table("products").select("*").order("created_at", desc=True)
+    if search:
+        query = query.or_(f"model_number.ilike.%{search}%,brand.ilike.%{search}%")
+    resp = query.execute()
+    return resp.data or []
+
+
+def update_product(product_id: str, data: dict) -> dict:
+    sb = get_client()
+    if "model_number" in data and data["model_number"]:
+        data["model_number"] = data["model_number"].strip().upper()
+    resp = sb.table("products").update(data).eq("id", product_id).execute()
+    if resp is None or not resp.data:
+        logger.error("update_product returned no data for %s", product_id)
+        return data
+    return resp.data[0]
+
+
+def delete_product(product_id: str):
+    sb = get_client()
+    sb.table("project_items").update({"product_id": None}).eq("product_id", product_id).execute()
+    sb.table("products").delete().eq("id", product_id).execute()
+
+
 # ---------------------------------------------------------------------------
 # Project items (line items extracted from a contract)
 # ---------------------------------------------------------------------------
@@ -110,6 +197,17 @@ def update_project_item(item_id: str, data: dict) -> dict:
         logger.error("update_project_item returned no data for %s", item_id)
         return data
     return resp.data[0]
+
+
+def delete_project_item(item_id: str):
+    sb = get_client()
+    sb.table("project_items").delete().eq("id", item_id).execute()
+
+
+def delete_project_items(item_ids: list[str]):
+    """Delete multiple project items by ID."""
+    sb = get_client()
+    sb.table("project_items").delete().in_("id", item_ids).execute()
 
 
 # ---------------------------------------------------------------------------

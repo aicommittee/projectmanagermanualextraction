@@ -8,11 +8,45 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F3F4F6; color: #1F2937; display: flex; height: 100vh; overflow: hidden; }
 
+        /* Auth screen */
+        .auth-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #1A3A5C 0%, #0F2440 100%); display: flex; align-items: center; justify-content: center; z-index: 500; }
+        .auth-screen.hidden { display: none; }
+        .auth-card { background: #fff; border-radius: 16px; padding: 40px; width: 440px; max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+        .auth-card h1 { font-size: 22px; color: #1A3A5C; text-align: center; margin-bottom: 4px; }
+        .auth-card .auth-subtitle { font-size: 13px; color: #6B7280; text-align: center; margin-bottom: 24px; }
+        .auth-tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 2px solid #E5E7EB; }
+        .auth-tab { flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 600; color: #6B7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+        .auth-tab:hover { color: #374151; }
+        .auth-tab.active { color: #2563EB; border-bottom-color: #2563EB; }
+        .auth-form { display: none; }
+        .auth-form.active { display: block; }
+        .auth-form label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+        .auth-form input { width: 100%; padding: 10px 12px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 14px; margin-bottom: 16px; }
+        .auth-form input:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        .auth-btn { width: 100%; padding: 12px; background: #2563EB; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .auth-btn:hover { background: #1D4ED8; }
+        .auth-btn:disabled { background: #93C5FD; cursor: not-allowed; }
+        .auth-btn.loading { position: relative; color: transparent; }
+        .auth-btn.loading::after { content: ''; position: absolute; width: 18px; height: 18px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; top: 50%; left: 50%; margin: -9px 0 0 -9px; }
+        .auth-error { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none; }
+        .auth-success { background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none; }
+        .auth-switch { text-align: center; font-size: 13px; color: #6B7280; margin-top: 16px; }
+        .auth-switch a { color: #2563EB; cursor: pointer; font-weight: 500; text-decoration: none; }
+        .auth-switch a:hover { text-decoration: underline; }
+
         /* Sidebar */
         .sidebar { width: 280px; background: #1A3A5C; color: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
         .sidebar-header { padding: 24px 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .sidebar-header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
         .sidebar-header p { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 4px; }
+        .user-info { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+        .user-info .user-name { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.9); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .role-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .role-badge-admin { background: #FEF3C7; color: #92400E; }
+        .role-badge-pm { background: #DBEAFE; color: #1E40AF; }
+        .logout-btn { background: none; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6); padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s; }
+        .logout-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
         .new-project-btn { margin: 16px 16px 8px; padding: 10px 16px; background: #2563EB; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
         .new-project-btn:hover { background: #1D4ED8; }
         .project-list { flex: 1; overflow-y: auto; padding: 8px; }
@@ -20,6 +54,7 @@
         .project-item:hover { background: rgba(255,255,255,0.1); }
         .project-item.active { background: rgba(255,255,255,0.15); font-weight: 600; }
         .project-item .date { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+        .project-item .project-owner { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 1px; font-weight: 400; }
 
         /* Main area */
         .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -32,6 +67,20 @@
         .btn-export:hover { background: #EFF6FF !important; }
         .btn-delete { color: #EF4444; border-color: #EF4444; }
         .btn-delete:hover { background: #FEF2F2 !important; }
+        .btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-delete.loading { position: relative; color: transparent; border-color: #FCA5A5; }
+        .btn-delete.loading::after { content: ''; position: absolute; width: 12px; height: 12px; border: 2px solid #EF4444; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; top: 50%; left: 50%; margin: -6px 0 0 -6px; }
+        .btn-download { color: #059669; border-color: #059669; }
+        .btn-download:hover { background: #ECFDF5 !important; }
+
+        /* Download progress overlay */
+        .download-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 200; }
+        .download-modal { background: #fff; border-radius: 12px; padding: 32px; width: 420px; max-width: 90vw; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .download-modal h3 { font-size: 16px; margin-bottom: 16px; color: #1A3A5C; }
+        .download-modal .download-status { font-size: 14px; color: #374151; margin-bottom: 16px; font-weight: 500; }
+        .download-modal .download-progress-bar { height: 8px; background: #E5E7EB; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+        .download-modal .download-progress-fill { height: 100%; background: linear-gradient(90deg, #059669, #34D399); border-radius: 4px; transition: width 0.3s ease; }
+        .download-modal .download-count { font-size: 12px; color: #9CA3AF; }
 
         .content { flex: 1; overflow-y: auto; padding: 24px; }
 
@@ -70,6 +119,8 @@
         .badge-not_found { background: #FEE2E2; color: #991B1B; }
         .badge-manual_entry { background: #FEF3C7; color: #92400E; }
         .badge-pending { background: #F3F4F6; color: #6B7280; }
+        .badge-active { background: #DCFCE7; color: #166534; }
+        .badge-pending-approval { background: #FEF3C7; color: #92400E; }
 
         /* Manual link */
         .manual-link { color: #2563EB; text-decoration: none; font-weight: 500; }
@@ -83,6 +134,47 @@
         .btn-save:hover { background: #1D4ED8; }
         .btn-retry { background: #F3F4F6; color: #6B7280; border: 1px solid #D1D5DB !important; }
         .btn-retry:hover { background: #E5E7EB; }
+        .btn-edit-warranty { background: none; border: none; cursor: pointer; font-size: 12px; color: #9CA3AF; padding: 2px 4px; }
+        .btn-edit-warranty:hover { color: #2563EB; }
+
+        /* Sidebar admin button */
+        .sidebar-divider { border-top: 1px solid rgba(255,255,255,0.1); margin: 8px 16px; }
+        .admin-btn { margin: 4px 16px 8px; padding: 10px 16px; background: transparent; color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; text-align: left; }
+        .admin-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .admin-btn.active { background: rgba(255,255,255,0.15); color: #fff; font-weight: 600; border-color: rgba(255,255,255,0.3); }
+
+        /* Sortable headers */
+        th.sortable { cursor: pointer; user-select: none; position: relative; padding-right: 20px !important; }
+        th.sortable:hover { background: #EFF6FF; }
+        th.sortable::after { content: '\2195'; position: absolute; right: 6px; color: #CBD5E1; font-size: 10px; }
+        th.sortable.sort-asc::after { content: '\2191'; color: #2563EB; }
+        th.sortable.sort-desc::after { content: '\2193'; color: #2563EB; }
+
+        /* Admin search bar */
+        .admin-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; }
+        .admin-search { flex: 1; max-width: 360px; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 14px; }
+        .admin-search:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        .btn-add-product { padding: 8px 16px; background: #2563EB; color: #fff; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .btn-add-product:hover { background: #1D4ED8; }
+
+        /* Admin table action buttons */
+        .btn-table-edit { background: none; border: 1px solid #D1D5DB; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; color: #2563EB; font-weight: 500; }
+        .btn-table-edit:hover { background: #EFF6FF; }
+        .btn-table-delete { background: none; border: 1px solid #D1D5DB; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; color: #EF4444; font-weight: 500; }
+        .btn-table-delete:hover { background: #FEF2F2; }
+        .btn-table-approve { background: none; border: 1px solid #D1D5DB; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; color: #059669; font-weight: 500; }
+        .btn-table-approve:hover { background: #ECFDF5; }
+        .admin-actions { display: flex; gap: 6px; }
+        .btn-upload-pdf { background: #F3F4F6; color: #6B7280; border: 1px solid #D1D5DB !important; padding: 4px 10px; font-size: 11px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+        .btn-upload-pdf:hover { background: #E5E7EB; color: #374151; }
+        .btn-upload-pdf.loading { color: transparent; position: relative; }
+        .btn-upload-pdf.loading::after { content: ''; position: absolute; width: 10px; height: 10px; border: 2px solid #6B7280; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; top: 50%; left: 50%; margin: -5px 0 0 -5px; }
+        .btn-upload-sm { background: none; border: none; cursor: pointer; font-size: 11px; color: #9CA3AF; padding: 2px 4px; }
+        .btn-upload-sm:hover { color: #2563EB; }
+        .modal-upload-zone { border: 2px dashed #D1D5DB; border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 16px; }
+        .modal-upload-zone:hover { border-color: #2563EB; background: #EFF6FF; }
+        .modal-upload-zone p { color: #6B7280; font-size: 13px; }
+        .modal-upload-zone .selected-file { color: #2563EB; font-weight: 600; }
 
         /* Modal */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
@@ -111,18 +203,99 @@
         .btn-upload.loading { position: relative; color: transparent; }
         .btn-upload.loading::after { content: ''; position: absolute; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; top: 50%; left: 50%; margin: -8px 0 0 -8px; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Checkbox column */
+        thead th.col-checkbox, tbody td.col-checkbox { width: 40px; text-align: center; padding: 8px; }
+        tbody td.col-checkbox input[type="checkbox"], thead th.col-checkbox input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #2563EB; }
+
+        /* Bulk actions toolbar */
+        .bulk-toolbar { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; margin-bottom: 16px; animation: slideDown 0.2s ease; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+        .bulk-toolbar .bulk-count { font-size: 13px; font-weight: 600; color: #1A3A5C; white-space: nowrap; }
+        .bulk-toolbar .bulk-actions { display: flex; gap: 8px; flex: 1; }
+        .bulk-toolbar button { padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid #D1D5DB; background: #fff; transition: all 0.15s; }
+        .btn-bulk-delete { color: #EF4444; border-color: #EF4444 !important; }
+        .btn-bulk-delete:hover { background: #FEF2F2 !important; }
+        .btn-bulk-download { color: #2563EB; border-color: #2563EB !important; }
+        .btn-bulk-download:hover { background: #EFF6FF !important; }
+        .btn-bulk-export { color: #059669; border-color: #059669 !important; }
+        .btn-bulk-export:hover { background: #ECFDF5 !important; }
+        .btn-bulk-clear { color: #6B7280; border-color: transparent !important; background: transparent !important; margin-left: auto; }
+        .btn-bulk-clear:hover { background: #F3F4F6 !important; }
+
+        /* Selected row highlight */
+        tbody tr.selected { background: #EFF6FF; }
+        tbody tr.selected:hover { background: #DBEAFE; }
+
+        /* Button working state (generic spinner for any action button) */
+        .btn-working { pointer-events: none; opacity: 0.7; color: transparent !important; position: relative; }
+        .btn-working::after { content: ''; position: absolute; width: 10px; height: 10px; border: 2px solid #9CA3AF; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; top: 50%; left: 50%; margin: -7px 0 0 -7px; }
+        .btn-table-edit.btn-working::after, .btn-table-delete.btn-working::after, .btn-table-approve.btn-working::after { width: 8px; height: 8px; margin: -6px 0 0 -6px; }
+
+        /* View loading spinner */
+        .view-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; color: #6B7280; }
+        .view-loading .spinner { width: 32px; height: 32px; border: 3px solid #E5E7EB; border-top-color: #2563EB; border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 16px; }
+        .view-loading p { font-size: 14px; font-weight: 500; }
     </style>
 </head>
 <body>
+
+<!-- Auth Screen -->
+<div class="auth-screen" id="authScreen">
+    <div class="auth-card">
+        <h1>ATI Manual Finder</h1>
+        <div class="auth-subtitle">Product Manual & Warranty Tool</div>
+
+        <div class="auth-tabs">
+            <div class="auth-tab active" id="loginTab" onclick="showAuthTab('login')">Log In</div>
+            <div class="auth-tab" id="registerTab" onclick="showAuthTab('register')">Register</div>
+        </div>
+
+        <div class="auth-error" id="authError"></div>
+        <div class="auth-success" id="authSuccess"></div>
+
+        <!-- Login Form -->
+        <div class="auth-form active" id="loginForm">
+            <label for="loginEmail">Email</label>
+            <input type="email" id="loginEmail" placeholder="you@atiofamerica.com">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" placeholder="Enter your password">
+            <button class="auth-btn" id="loginBtn" onclick="login()">Log In</button>
+            <div class="auth-switch">Don't have an account? <a onclick="showAuthTab('register')">Register</a></div>
+        </div>
+
+        <!-- Register Form -->
+        <div class="auth-form" id="registerForm">
+            <label for="registerName">Full Name</label>
+            <input type="text" id="registerName" placeholder="e.g. Ben Ray">
+            <label for="registerEmail">Email</label>
+            <input type="email" id="registerEmail" placeholder="you@atiofamerica.com">
+            <label for="registerPassword">Password</label>
+            <input type="password" id="registerPassword" placeholder="At least 6 characters">
+            <label for="registerConfirm">Confirm Password</label>
+            <input type="password" id="registerConfirm" placeholder="Re-enter your password">
+            <button class="auth-btn" id="registerBtn" onclick="register()">Create Account</button>
+            <div class="auth-switch">Already have an account? <a onclick="showAuthTab('login')">Log In</a></div>
+        </div>
+    </div>
+</div>
 
 <!-- Sidebar -->
 <aside class="sidebar">
     <div class="sidebar-header">
         <h1>ATI Manual Finder</h1>
         <p>Product Manual &amp; Warranty Tool</p>
+        <div class="user-info" id="userInfo" style="display:none;">
+            <span class="user-name" id="userName"></span>
+            <span class="role-badge" id="userRole"></span>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
     </div>
-    <button class="new-project-btn" onclick="openModal()">+ New Project</button>
+    <button class="new-project-btn" id="newProjectBtn" onclick="openModal()" style="display:none;">+ New Project</button>
     <div class="project-list" id="projectList"></div>
+    <div class="sidebar-divider"></div>
+    <button class="admin-btn" id="adminBtn" onclick="loadProductLibrary()">&#9881; Product Library</button>
+    <button class="admin-btn" id="usersBtn" onclick="loadUserManagement()" style="display:none;">&#128101; Users</button>
 </aside>
 
 <!-- Main Content -->
@@ -130,6 +303,8 @@
     <div class="topbar" id="topbar">
         <h2 id="projectTitle">Select a project</h2>
         <div class="topbar-actions" id="topbarActions" style="display:none;">
+            <button class="btn-add-items" onclick="openAddItemsModal()" style="color:#059669; border-color:#059669;">+ Add Items</button>
+            <button class="btn-download" onclick="downloadProjectPdfs()">Download PDFs</button>
             <button class="btn-export" onclick="exportExcel()">Export Excel</button>
             <button class="btn-delete" onclick="deleteProject()">Delete</button>
         </div>
@@ -160,19 +335,95 @@
     </div>
 </div>
 
+<!-- Add Product Modal -->
+<div class="modal-overlay" id="addProductOverlay">
+    <div class="modal">
+        <h3 id="productModalTitle">Add Product</h3>
+        <input type="hidden" id="editProductId">
+        <label for="prodBrand">Brand</label>
+        <input type="text" id="prodBrand" placeholder="e.g. Crestron">
+        <label for="prodModel">Model Number *</label>
+        <input type="text" id="prodModel" placeholder="e.g. DM-NVX-D30">
+        <label for="prodName">Product Name</label>
+        <input type="text" id="prodName" placeholder="e.g. 4K60 Network AV Decoder">
+        <label for="prodManualUrl">Manual URL</label>
+        <input type="text" id="prodManualUrl" placeholder="https://...">
+        <label>Or upload a PDF manual</label>
+        <div class="modal-upload-zone" id="prodUploadZone" onclick="document.getElementById('prodFileInput').click()">
+            <p id="prodUploadText">Click to select a PDF file</p>
+        </div>
+        <input type="file" id="prodFileInput" accept=".pdf" style="display:none">
+        <label for="prodWarranty">Warranty</label>
+        <input type="text" id="prodWarranty" placeholder="e.g. 3 Year Limited">
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeAddProductModal()">Cancel</button>
+            <button class="btn-upload" id="btnSaveProduct" onclick="saveProductFromModal()">Save Product</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Items Modal -->
+<div class="modal-overlay" id="addItemsOverlay">
+    <div class="modal">
+        <h3>Add Items (Change Order)</h3>
+        <p style="font-size:13px; color:#6B7280; margin-bottom:16px;">Upload an additional contract PDF to add new products to this project. Duplicate products will be skipped automatically.</p>
+        <label>Contract PDF</label>
+        <div class="drop-zone" id="addItemsDropZone" onclick="document.getElementById('addItemsFileInput').click()">
+            <p id="addItemsDropText">Drag & drop a PDF here, or click to browse</p>
+        </div>
+        <input type="file" id="addItemsFileInput" accept=".pdf" style="display:none">
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeAddItemsModal()">Cancel</button>
+            <button class="btn-upload" id="btnAddItems" disabled onclick="uploadAdditionalItems()">Upload &amp; Process</button>
+        </div>
+    </div>
+</div>
+
+<!-- Download Progress Overlay -->
+<div class="download-overlay" id="downloadOverlay" style="display:none;">
+    <div class="download-modal">
+        <h3>Downloading Manuals</h3>
+        <div class="download-status" id="downloadStatus">Preparing download...</div>
+        <div class="download-progress-bar"><div class="download-progress-fill" id="downloadFill" style="width:0%"></div></div>
+        <div class="download-count" id="downloadCount"></div>
+    </div>
+</div>
+
 <script>
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 let currentProjectId = null;
+let currentView = 'projects'; // 'projects', 'admin', or 'users'
 let pollInterval = null;
 let selectedFile = null;
+let selectedItemIds = new Set();
+let projectItems = [];
+let projectProgress = {};
+let projectSortField = 'brand';
+let projectSortDir = 'asc';
+
+// Auth state
+let currentUser = null;
+let authToken = localStorage.getItem('ati_token');
 
 // ---------------------------------------------------------------------------
-// API helper
+// API helper (includes auth token automatically)
 // ---------------------------------------------------------------------------
 async function api(path, options = {}) {
+    if (!options.headers) options.headers = {};
+    if (authToken && !options.headers['Authorization']) {
+        options.headers['Authorization'] = 'Bearer ' + authToken;
+    }
     const resp = await fetch('/api' + path, options);
+    if (resp.status === 401) {
+        logout();
+        throw new Error('Session expired. Please log in again.');
+    }
+    if (resp.status === 403) {
+        const text = await resp.text();
+        throw new Error(text);
+    }
     if (!resp.ok) {
         const text = await resp.text();
         throw new Error('API error ' + resp.status + ': ' + text);
@@ -180,21 +431,214 @@ async function api(path, options = {}) {
     return resp.json();
 }
 
+// Fetch that returns raw response (for file downloads)
+async function apiFetch(path, options = {}) {
+    if (!options.headers) options.headers = {};
+    if (authToken && !options.headers['Authorization']) {
+        options.headers['Authorization'] = 'Bearer ' + authToken;
+    }
+    return fetch('/api' + path, options);
+}
+
+// ---------------------------------------------------------------------------
+// Auth: login, register, logout
+// ---------------------------------------------------------------------------
+function showAuthTab(tab) {
+    document.getElementById('authError').style.display = 'none';
+    document.getElementById('authSuccess').style.display = 'none';
+
+    if (tab === 'login') {
+        document.getElementById('loginTab').classList.add('active');
+        document.getElementById('registerTab').classList.remove('active');
+        document.getElementById('loginForm').classList.add('active');
+        document.getElementById('registerForm').classList.remove('active');
+    } else {
+        document.getElementById('loginTab').classList.remove('active');
+        document.getElementById('registerTab').classList.add('active');
+        document.getElementById('loginForm').classList.remove('active');
+        document.getElementById('registerForm').classList.add('active');
+    }
+}
+
+function showAuthError(msg) {
+    var el = document.getElementById('authError');
+    el.textContent = msg;
+    el.style.display = 'block';
+    document.getElementById('authSuccess').style.display = 'none';
+}
+
+function showAuthSuccess(msg) {
+    var el = document.getElementById('authSuccess');
+    el.textContent = msg;
+    el.style.display = 'block';
+    document.getElementById('authError').style.display = 'none';
+}
+
+async function login() {
+    var email = document.getElementById('loginEmail').value.trim();
+    var password = document.getElementById('loginPassword').value;
+
+    if (!email || !password) {
+        showAuthError('Please enter email and password.');
+        return;
+    }
+
+    var btn = document.getElementById('loginBtn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+
+    try {
+        var resp = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, password: password }),
+        });
+
+        var data = await resp.json();
+
+        if (resp.status === 403) {
+            showAuthError(data.detail || 'Account pending admin approval.');
+            return;
+        }
+        if (!resp.ok) {
+            showAuthError(data.detail || 'Login failed.');
+            return;
+        }
+
+        authToken = data.token;
+        currentUser = data.user;
+        localStorage.setItem('ati_token', authToken);
+
+        document.getElementById('authScreen').classList.add('hidden');
+        updateUIForRole();
+        loadProjects();
+    } catch (e) {
+        showAuthError('Connection error. Please try again.');
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+    }
+}
+
+async function register() {
+    var name = document.getElementById('registerName').value.trim();
+    var email = document.getElementById('registerEmail').value.trim();
+    var password = document.getElementById('registerPassword').value;
+    var confirm = document.getElementById('registerConfirm').value;
+
+    if (!name || !email || !password) {
+        showAuthError('All fields are required.');
+        return;
+    }
+    if (password.length < 6) {
+        showAuthError('Password must be at least 6 characters.');
+        return;
+    }
+    if (password !== confirm) {
+        showAuthError('Passwords do not match.');
+        return;
+    }
+
+    var btn = document.getElementById('registerBtn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+
+    try {
+        var resp = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, email: email, password: password }),
+        });
+
+        var data = await resp.json();
+
+        if (!resp.ok) {
+            showAuthError(data.detail || 'Registration failed.');
+            return;
+        }
+
+        showAuthSuccess(data.message);
+
+        // If auto-approved (first user = admin), switch to login tab
+        if (data.approved) {
+            setTimeout(function() { showAuthTab('login'); }, 1500);
+        }
+    } catch (e) {
+        showAuthError('Connection error. Please try again.');
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+    }
+}
+
+function logout() {
+    authToken = null;
+    currentUser = null;
+    currentProjectId = null;
+    localStorage.removeItem('ati_token');
+    stopPolling();
+
+    document.getElementById('authScreen').classList.remove('hidden');
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('authError').style.display = 'none';
+    document.getElementById('authSuccess').style.display = 'none';
+    showAuthTab('login');
+}
+
+function updateUIForRole() {
+    if (!currentUser) return;
+
+    // Show user info
+    document.getElementById('userInfo').style.display = 'flex';
+    document.getElementById('userName').textContent = currentUser.name;
+    var roleEl = document.getElementById('userRole');
+    roleEl.textContent = currentUser.role.toUpperCase();
+    roleEl.className = 'role-badge role-badge-' + currentUser.role;
+
+    // PM can create projects, admin cannot
+    document.getElementById('newProjectBtn').style.display =
+        currentUser.role === 'admin' ? 'none' : 'block';
+
+    // Admin can see Users button
+    document.getElementById('usersBtn').style.display =
+        currentUser.role === 'admin' ? 'block' : 'none';
+}
+
+// Handle enter key on login/register forms
+document.getElementById('loginPassword').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') login();
+});
+document.getElementById('registerConfirm').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') register();
+});
+
 // ---------------------------------------------------------------------------
 // Projects sidebar
 // ---------------------------------------------------------------------------
 async function loadProjects() {
-    const projects = await api('/projects');
-    const list = document.getElementById('projectList');
+    var projects;
+    try {
+        projects = await api('/projects');
+    } catch (e) {
+        return;
+    }
+    var list = document.getElementById('projectList');
     if (projects.length === 0) {
         list.innerHTML = '<p style="padding:16px;color:rgba(255,255,255,0.5);font-size:13px;">No projects yet</p>';
         return;
     }
-    list.innerHTML = projects.map(p => {
-        const d = new Date(p.created_at);
-        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    var isAdmin = currentUser && currentUser.role === 'admin';
+    list.innerHTML = projects.map(function(p) {
+        var d = new Date(p.created_at);
+        var dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        var ownerHtml = '';
+        if (isAdmin && p.users) {
+            ownerHtml = '<div class="project-owner">' + escapeHtml(p.users.name || p.users.email) + '</div>';
+        }
         return '<div class="project-item' + (p.id === currentProjectId ? ' active' : '') + '" onclick="loadProject(\'' + p.id + '\')">' +
             '<div>' + escapeHtml(p.name) + '</div>' +
+            ownerHtml +
             '<div class="date">' + dateStr + '</div>' +
         '</div>';
     }).join('');
@@ -205,20 +649,44 @@ async function loadProjects() {
 // ---------------------------------------------------------------------------
 async function loadProject(id) {
     currentProjectId = id;
+    currentView = 'projects';
     stopPolling();
+    document.getElementById('adminBtn').classList.remove('active');
+    document.getElementById('usersBtn').classList.remove('active');
+    document.getElementById('topbarActions').style.display = 'none';
+    document.getElementById('projectTitle').textContent = 'Loading...';
+    document.getElementById('content').innerHTML = '<div class="view-loading"><div class="spinner"></div><p>Loading project...</p></div>';
+    loadProjects();
 
-    const data = await api('/projects/' + id);
-    const project = data.project;
-    const items = data.items;
-    const progress = data.progress;
+    var data;
+    try {
+        data = await api('/projects/' + id);
+    } catch (e) {
+        currentProjectId = null;
+        document.getElementById('projectTitle').textContent = 'Select a project';
+        document.getElementById('topbarActions').style.display = 'none';
+        document.getElementById('content').innerHTML = '<div class="empty-state"><h3>Project not found</h3><p>This project may have been deleted or you may not have access.</p></div>';
+        await loadProjects();
+        return;
+    }
+
+    var project = data.project;
+    projectItems = data.items;
+    projectProgress = data.progress;
 
     document.getElementById('projectTitle').textContent = project.name;
     document.getElementById('topbarActions').style.display = 'flex';
-    loadProjects(); // refresh active state
 
-    renderProjectView(items, progress);
+    // Hide add-items button for admin
+    var addItemsBtn = document.querySelector('.btn-add-items');
+    if (addItemsBtn) {
+        addItemsBtn.style.display = (currentUser && currentUser.role === 'admin') ? 'none' : '';
+    }
 
-    if (!progress.done) {
+    sortProjectItems();
+    renderProjectView(projectItems, projectProgress);
+
+    if (!projectProgress.done) {
         startPolling(id);
     }
 }
@@ -227,15 +695,18 @@ async function loadProject(id) {
 // Render project view
 // ---------------------------------------------------------------------------
 function renderProjectView(items, progress) {
-    const content = document.getElementById('content');
+    var content = document.getElementById('content');
 
-    const total = items.length;
-    const found = items.filter(i => i.status === 'found').length;
-    const notFound = items.filter(i => i.status === 'not_found').length;
-    const pending = items.filter(i => i.status === 'pending').length;
-    const manualEntry = items.filter(i => i.status === 'manual_entry').length;
+    var existingIds = new Set(items.map(function(i) { return i.id; }));
+    selectedItemIds = new Set([...selectedItemIds].filter(function(id) { return existingIds.has(id); }));
 
-    let html = '';
+    var total = items.length;
+    var found = items.filter(function(i) { return i.status === 'found'; }).length;
+    var notFound = items.filter(function(i) { return i.status === 'not_found'; }).length;
+    var pending = items.filter(function(i) { return i.status === 'pending'; }).length;
+    var manualEntry = items.filter(function(i) { return i.status === 'manual_entry'; }).length;
+
+    var html = '';
 
     // Stats cards
     html += '<div class="stats">';
@@ -245,28 +716,46 @@ function renderProjectView(items, progress) {
     html += '<div class="stat-card processing"><div class="label">Processing</div><div class="value">' + pending + '</div></div>';
     html += '</div>';
 
-    // Progress bar (only if processing)
+    // Progress bar
     if (!progress.done) {
-        const pct = total > 0 ? Math.round(((total - pending) / total) * 100) : 0;
+        var pct = total > 0 ? Math.round(((total - pending) / total) * 100) : 0;
         html += '<div class="progress-section">';
         html += '<div class="progress-text">' + escapeHtml(progress.message) + '</div>';
         html += '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
         html += '</div>';
     }
 
+    // Bulk actions toolbar
+    html += '<div class="bulk-toolbar" id="bulkToolbar" style="display:none;">';
+    html += '<span class="bulk-count" id="bulkCount">0 selected</span>';
+    html += '<div class="bulk-actions">';
+    html += '<button class="btn-bulk-delete" onclick="bulkDeleteSelected()">Delete Selected</button>';
+    html += '<button class="btn-bulk-download" onclick="bulkDownloadSelected()">Download PDFs</button>';
+    html += '<button class="btn-bulk-export" onclick="bulkExportSelected()">Export Excel</button>';
+    html += '</div>';
+    html += '<button class="btn-bulk-clear" onclick="clearSelection()">Clear</button>';
+    html += '</div>';
+
     // Product table
     if (items.length > 0) {
+        var allChecked = items.length > 0 && selectedItemIds.size === items.length;
         html += '<div class="table-container"><table>';
-        html += '<thead><tr><th>Brand</th><th>Model</th><th>Product Name</th><th>Warranty</th><th>Manual</th><th>Status</th></tr></thead>';
+        html += '<thead><tr>';
+        html += '<th class="col-checkbox"><input type="checkbox" id="selectAll" ' + (allChecked ? 'checked' : '') + ' onchange="toggleSelectAll(this)"></th>';
+        html += '<th class="sortable' + (projectSortField === 'brand' ? ' sort-' + projectSortDir : '') + '" onclick="sortProjectBy(\'brand\')">Brand</th>';
+        html += '<th class="sortable' + (projectSortField === 'model_number' ? ' sort-' + projectSortDir : '') + '" onclick="sortProjectBy(\'model_number\')">Model</th>';
+        html += '<th class="sortable' + (projectSortField === 'product_name' ? ' sort-' + projectSortDir : '') + '" onclick="sortProjectBy(\'product_name\')">Product Name</th>';
+        html += '<th>Warranty</th><th>Manual</th><th>Status</th>';
+        html += '</tr></thead>';
         html += '<tbody>';
-        items.forEach(item => {
-            const product = item.products;
-            const warranty = (product && product.warranty_length) ? escapeHtml(product.warranty_length) : '—';
-            html += '<tr>';
+        items.forEach(function(item) {
+            var isSelected = selectedItemIds.has(item.id);
+            html += '<tr class="' + (isSelected ? 'selected' : '') + '">';
+            html += '<td class="col-checkbox"><input type="checkbox" data-item-id="' + item.id + '" ' + (isSelected ? 'checked' : '') + ' onchange="toggleItemSelect(this)"></td>';
             html += '<td>' + escapeHtml(item.brand || '') + '</td>';
             html += '<td><span class="model-pill">' + escapeHtml(item.model_number || '') + '</span></td>';
             html += '<td>' + escapeHtml(item.product_name || '') + '</td>';
-            html += '<td>' + warranty + '</td>';
+            html += '<td>' + renderWarrantyCell(item) + '</td>';
             html += '<td>' + renderManualCell(item) + '</td>';
             html += '<td><span class="badge badge-' + item.status + '">' + formatStatus(item.status) + '</span></td>';
             html += '</tr>';
@@ -275,30 +764,64 @@ function renderProjectView(items, progress) {
     }
 
     content.innerHTML = html;
+    updateBulkToolbar();
+}
+
+function renderWarrantyCell(item) {
+    var product = item.products;
+    var warranty = (product && product.warranty_length) ? product.warranty_length : '';
+
+    if (item.status === 'not_found') {
+        return '<div class="inline-input">' +
+            '<input type="text" placeholder="e.g. 2 Year Limited" id="warranty-' + item.id + '" value="' + escapeHtml(warranty) + '" style="width:130px;">' +
+            '</div>';
+    }
+
+    if (item.status === 'found' || item.status === 'manual_entry') {
+        return '<span id="warranty-display-' + item.id + '">' +
+            (warranty ? escapeHtml(warranty) : '<span style="color:#9CA3AF">-</span>') +
+            '</span>' +
+            '<button class="btn-edit-warranty" onclick="editWarranty(\'' + item.id + '\', \'' + escapeHtml(warranty).replace(/'/g, "\\'") + '\')" title="Edit warranty">&#9998;</button>' +
+            '<span id="warranty-edit-' + item.id + '" style="display:none;">' +
+            '<div class="inline-input">' +
+            '<input type="text" id="warranty-input-' + item.id + '" value="' + escapeHtml(warranty) + '" style="width:130px;">' +
+            '<button class="btn-save" onclick="saveWarranty(\'' + item.id + '\')">Save</button>' +
+            '</div></span>';
+    }
+
+    if (item.status === 'pending') {
+        return '<span style="color:#9CA3AF">-</span>';
+    }
+    return '-';
 }
 
 function renderManualCell(item) {
     if (item.status === 'found' || item.status === 'manual_entry') {
+        var html = '';
         if (item.manual_url) {
-            return '<a class="manual-link" href="' + escapeHtml(item.manual_url) + '" target="_blank">Open Manual</a>';
+            html += '<a class="manual-link" href="' + escapeHtml(item.manual_url) + '" target="_blank">Open Manual</a> ';
         }
-        return '—';
+        html += '<button class="btn-upload-sm" onclick="triggerItemUpload(\'' + item.id + '\')" title="Upload/replace PDF">&#8593;PDF</button>';
+        html += '<input type="file" accept=".pdf" id="file-' + item.id + '" style="display:none" onchange="uploadItemManual(\'' + item.id + '\')">';
+        return html;
     }
     if (item.status === 'not_found') {
         return '<div class="inline-input">' +
             '<input type="text" placeholder="Paste manual URL" id="url-' + item.id + '">' +
-            '<button class="btn-save" onclick="saveManualUrl(\'' + item.id + '\')">Save</button>' +
+            '<button class="btn-save" onclick="saveManualUrlAndWarranty(\'' + item.id + '\')">Save</button>' +
+            '<button class="btn-upload-pdf" id="upload-btn-' + item.id + '" onclick="triggerItemUpload(\'' + item.id + '\')">Upload PDF</button>' +
+            '<input type="file" accept=".pdf" id="file-' + item.id + '" style="display:none" onchange="uploadItemManual(\'' + item.id + '\')">' +
             '<button class="btn-retry" onclick="retryItem(\'' + item.id + '\')">Retry</button>' +
         '</div>';
     }
     if (item.status === 'pending') {
         return '<span style="color:#9CA3AF">Processing...</span>';
     }
-    return '—';
+    return '-';
 }
 
 function formatStatus(status) {
-    const labels = { found: 'Found', not_found: 'Not Found', manual_entry: 'Manual Entry', pending: 'Pending' };
+    var labels = { found: 'Found', not_found: 'Not Found', manual_entry: 'Manual Entry', pending: 'Pending' };
     return labels[status] || status;
 }
 
@@ -307,16 +830,18 @@ function formatStatus(status) {
 // ---------------------------------------------------------------------------
 function startPolling(projectId) {
     stopPolling();
-    pollInterval = setInterval(async () => {
+    pollInterval = setInterval(async function() {
         try {
-            const progress = await api('/projects/' + projectId + '/progress');
+            var progress = await api('/projects/' + projectId + '/progress');
             if (progress.done) {
                 stopPolling();
                 await loadProject(projectId);
             } else {
-                // Update progress bar inline
-                const items = (await api('/projects/' + projectId)).items;
-                renderProjectView(items, progress);
+                var data = await api('/projects/' + projectId);
+                projectItems = data.items;
+                projectProgress = progress;
+                sortProjectItems();
+                renderProjectView(projectItems, progress);
             }
         } catch (e) {
             console.error('Poll error:', e);
@@ -332,43 +857,345 @@ function stopPolling() {
 }
 
 // ---------------------------------------------------------------------------
-// Save manual URL
+// Save manual URL + warranty (for not_found items)
 // ---------------------------------------------------------------------------
-async function saveManualUrl(itemId) {
-    const input = document.getElementById('url-' + itemId);
-    const url = input.value.trim();
-    if (!url) return;
-    await api('/items/' + itemId, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ manual_url: url, status: 'manual_entry' }),
-    });
-    await loadProject(currentProjectId);
+async function saveManualUrlAndWarranty(itemId) {
+    var urlInput = document.getElementById('url-' + itemId);
+    var warrantyInput = document.getElementById('warranty-' + itemId);
+    var url = urlInput ? urlInput.value.trim() : '';
+    var warranty = warrantyInput ? warrantyInput.value.trim() : '';
+
+    if (!url && !warranty) return;
+
+    var payload = {};
+    if (url) {
+        payload.manual_url = url;
+        payload.status = 'manual_entry';
+    }
+    if (warranty) {
+        payload.warranty_length = warranty;
+    }
+
+    var btn = event.target.closest('.btn-save') || event.target;
+    btn.classList.add('btn-working');
+    try {
+        await api('/items/' + itemId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        await loadProject(currentProjectId);
+    } catch (e) {
+        alert('Save failed: ' + e.message);
+        btn.classList.remove('btn-working');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Edit warranty (for found/manual_entry items)
+// ---------------------------------------------------------------------------
+function editWarranty(itemId, currentValue) {
+    var display = document.getElementById('warranty-display-' + itemId);
+    var edit = document.getElementById('warranty-edit-' + itemId);
+    if (display) display.style.display = 'none';
+    if (edit) edit.style.display = 'inline';
+    var input = document.getElementById('warranty-input-' + itemId);
+    if (input) input.focus();
+}
+
+async function saveWarranty(itemId) {
+    var input = document.getElementById('warranty-input-' + itemId);
+    var warranty = input ? input.value.trim() : '';
+    if (!warranty) return;
+
+    var btn = event.target.closest('button') || event.target;
+    btn.classList.add('btn-working');
+    try {
+        await api('/items/' + itemId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ warranty_length: warranty }),
+        });
+        await loadProject(currentProjectId);
+    } catch (e) {
+        alert('Save failed: ' + e.message);
+        btn.classList.remove('btn-working');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Upload PDF manual for a project item
+// ---------------------------------------------------------------------------
+function triggerItemUpload(itemId) {
+    document.getElementById('file-' + itemId).click();
+}
+
+async function uploadItemManual(itemId) {
+    var fileInput = document.getElementById('file-' + itemId);
+    var file = fileInput.files[0];
+    if (!file) return;
+
+    var btn = document.getElementById('upload-btn-' + itemId);
+    if (btn) { btn.classList.add('loading'); btn.disabled = true; }
+
+    try {
+        var form = new FormData();
+        form.append('file', file);
+        await api('/items/' + itemId + '/upload-manual', { method: 'POST', body: form });
+        await loadProject(currentProjectId);
+    } catch (e) {
+        alert('Upload failed: ' + e.message);
+    } finally {
+        if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Retry item
 // ---------------------------------------------------------------------------
 async function retryItem(itemId) {
-    const btn = event.target;
-    btn.textContent = '...';
-    btn.disabled = true;
+    var btn = event.target;
+    btn.classList.add('btn-working');
     try {
         await api('/items/' + itemId + '/retry', { method: 'POST' });
         await loadProject(currentProjectId);
     } catch (e) {
         alert('Retry failed: ' + e.message);
+        btn.classList.remove('btn-working');
         btn.textContent = 'Retry';
-        btn.disabled = false;
     }
 }
 
 // ---------------------------------------------------------------------------
-// Export Excel
+// Selection and Bulk Operations
 // ---------------------------------------------------------------------------
-function exportExcel() {
+
+function toggleSelectAll(checkbox) {
+    var checkboxes = document.querySelectorAll('tbody td.col-checkbox input[type="checkbox"]');
+    checkboxes.forEach(function(cb) {
+        var itemId = cb.getAttribute('data-item-id');
+        if (checkbox.checked) {
+            selectedItemIds.add(itemId);
+            cb.checked = true;
+            cb.closest('tr').classList.add('selected');
+        } else {
+            selectedItemIds.delete(itemId);
+            cb.checked = false;
+            cb.closest('tr').classList.remove('selected');
+        }
+    });
+    updateBulkToolbar();
+}
+
+function toggleItemSelect(checkbox) {
+    var itemId = checkbox.getAttribute('data-item-id');
+    if (checkbox.checked) {
+        selectedItemIds.add(itemId);
+        checkbox.closest('tr').classList.add('selected');
+    } else {
+        selectedItemIds.delete(itemId);
+        checkbox.closest('tr').classList.remove('selected');
+    }
+    var allCheckboxes = document.querySelectorAll('tbody td.col-checkbox input[type="checkbox"]');
+    var selectAll = document.getElementById('selectAll');
+    if (selectAll) {
+        selectAll.checked = allCheckboxes.length > 0 && selectedItemIds.size === allCheckboxes.length;
+    }
+    updateBulkToolbar();
+}
+
+function clearSelection() {
+    selectedItemIds.clear();
+    document.querySelectorAll('tbody td.col-checkbox input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = false;
+        cb.closest('tr').classList.remove('selected');
+    });
+    var selectAll = document.getElementById('selectAll');
+    if (selectAll) selectAll.checked = false;
+    updateBulkToolbar();
+}
+
+function updateBulkToolbar() {
+    var toolbar = document.getElementById('bulkToolbar');
+    var count = document.getElementById('bulkCount');
+    if (!toolbar) return;
+    if (selectedItemIds.size > 0) {
+        toolbar.style.display = 'flex';
+        count.textContent = selectedItemIds.size + ' selected';
+    } else {
+        toolbar.style.display = 'none';
+    }
+}
+
+async function bulkDeleteSelected() {
+    if (selectedItemIds.size === 0) return;
+    if (!confirm('Delete ' + selectedItemIds.size + ' selected item(s) from this project?')) return;
+    var btn = document.querySelector('.btn-bulk-delete');
+    if (btn) btn.classList.add('btn-working');
+    try {
+        await api('/items/batch-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item_ids: Array.from(selectedItemIds) }),
+        });
+        selectedItemIds.clear();
+        await loadProject(currentProjectId);
+    } catch (e) {
+        alert('Delete failed: ' + e.message);
+        if (btn) btn.classList.remove('btn-working');
+    }
+}
+
+function bulkDownloadSelected() {
+    if (selectedItemIds.size === 0) return;
+    startDownloadFlow(Array.from(selectedItemIds));
+}
+
+async function bulkExportSelected() {
+    if (selectedItemIds.size === 0) return;
+    var ids = Array.from(selectedItemIds).join(',');
+    var btn = document.querySelector('.btn-bulk-export');
+    if (btn) btn.classList.add('btn-working');
+    try {
+        var resp = await apiFetch('/projects/' + currentProjectId + '/export?ids=' + ids);
+        if (!resp.ok) throw new Error('Export failed');
+        var blob = await resp.blob();
+        downloadBlob(blob, resp);
+    } catch (e) {
+        alert('Export failed: ' + e.message);
+    } finally {
+        if (btn) btn.classList.remove('btn-working');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Export Excel (via fetch + blob for auth)
+// ---------------------------------------------------------------------------
+async function exportExcel() {
     if (!currentProjectId) return;
-    window.location.href = '/api/projects/' + currentProjectId + '/export';
+    var btn = document.querySelector('.btn-export');
+    if (btn) btn.classList.add('btn-working');
+    try {
+        var resp = await apiFetch('/projects/' + currentProjectId + '/export');
+        if (!resp.ok) throw new Error('Export failed');
+        var blob = await resp.blob();
+        downloadBlob(blob, resp);
+    } catch (e) {
+        alert('Export failed: ' + e.message);
+    } finally {
+        if (btn) btn.classList.remove('btn-working');
+    }
+}
+
+function downloadBlob(blob, resp) {
+    var url = window.URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var disposition = resp.headers.get('Content-Disposition');
+    var filename = 'export.xlsx';
+    if (disposition) {
+        var match = disposition.match(/filename="?([^"]+)"?/);
+        if (match) filename = match[1];
+    }
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+}
+
+// ---------------------------------------------------------------------------
+// Download PDFs with progress
+// ---------------------------------------------------------------------------
+var downloadPollInterval = null;
+
+function downloadProjectPdfs() {
+    if (!currentProjectId) return;
+    startDownloadFlow(null);
+}
+
+async function startDownloadFlow(itemIds) {
+    document.getElementById('downloadOverlay').style.display = 'flex';
+    document.getElementById('downloadStatus').textContent = 'Preparing download...';
+    document.getElementById('downloadFill').style.width = '0%';
+    document.getElementById('downloadCount').textContent = '';
+
+    try {
+        var body = itemIds ? { ids: itemIds } : {};
+        var result = await api('/projects/' + currentProjectId + '/start-download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        pollDownloadProgress(result.download_id);
+    } catch (e) {
+        document.getElementById('downloadOverlay').style.display = 'none';
+        if (e.message.includes('No manuals available')) {
+            alert('No manuals available to download.');
+        } else {
+            alert('Download failed: ' + e.message);
+        }
+    }
+}
+
+function pollDownloadProgress(jobId) {
+    if (downloadPollInterval) clearInterval(downloadPollInterval);
+
+    downloadPollInterval = setInterval(async function() {
+        try {
+            var progress = await api('/downloads/' + jobId + '/progress');
+
+            if (progress.status === 'done') {
+                clearInterval(downloadPollInterval);
+                downloadPollInterval = null;
+
+                document.getElementById('downloadStatus').textContent = 'Download ready! Starting...';
+                document.getElementById('downloadFill').style.width = '100%';
+                document.getElementById('downloadCount').textContent = progress.total + ' of ' + progress.total + ' manuals';
+
+                await finishDownload(jobId);
+                document.getElementById('downloadOverlay').style.display = 'none';
+            } else if (progress.status === 'error') {
+                clearInterval(downloadPollInterval);
+                downloadPollInterval = null;
+                document.getElementById('downloadOverlay').style.display = 'none';
+                alert('Download failed: ' + progress.message);
+            } else {
+                var pct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
+                document.getElementById('downloadStatus').textContent = progress.message;
+                document.getElementById('downloadFill').style.width = pct + '%';
+                document.getElementById('downloadCount').textContent = progress.current + ' of ' + progress.total + ' manuals';
+            }
+        } catch (e) {
+            console.error('Download poll error:', e);
+        }
+    }, 1000);
+}
+
+async function finishDownload(jobId) {
+    try {
+        var resp = await apiFetch('/downloads/' + jobId + '/file');
+        if (!resp.ok) throw new Error('Download failed');
+
+        var blob = await resp.blob();
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        var disposition = resp.headers.get('Content-Disposition');
+        var filename = 'manuals.zip';
+        if (disposition) {
+            var match = disposition.match(/filename="?([^"]+)"?/);
+            if (match) filename = match[1];
+        }
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (e) {
+        alert('File download failed: ' + e.message);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +1204,25 @@ function exportExcel() {
 async function deleteProject() {
     if (!currentProjectId) return;
     if (!confirm('Delete this project and all its items?')) return;
-    await api('/projects/' + currentProjectId, { method: 'DELETE' });
+
+    var btn = document.querySelector('.btn-delete');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.textContent = 'Deleting...';
+
+    try {
+        await api('/projects/' + currentProjectId, { method: 'DELETE' });
+    } catch (e) {
+        if (!e.message.includes('404')) {
+            alert('Delete failed: ' + e.message);
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            btn.textContent = 'Delete';
+            return;
+        }
+    }
+
     currentProjectId = null;
     stopPolling();
     document.getElementById('projectTitle').textContent = 'Select a project';
@@ -404,12 +1249,11 @@ function closeModal() {
 }
 
 function checkUploadReady() {
-    const name = document.getElementById('projectName').value.trim();
+    var name = document.getElementById('projectName').value.trim();
     document.getElementById('btnUpload').disabled = !(name && selectedFile);
 }
 
-// File input change
-document.getElementById('fileInput').addEventListener('change', (e) => {
+document.getElementById('fileInput').addEventListener('change', function(e) {
     if (e.target.files[0]) {
         selectedFile = e.target.files[0];
         document.getElementById('dropText').textContent = selectedFile.name;
@@ -418,17 +1262,15 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
     }
 });
 
-// Project name input
 document.getElementById('projectName').addEventListener('input', checkUploadReady);
 
-// Drag and drop
-const dropZone = document.getElementById('dropZone');
-dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('drag-over'); });
-dropZone.addEventListener('drop', (e) => {
+var dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('drag-over'); });
+dropZone.addEventListener('drop', function(e) {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
+    var file = e.dataTransfer.files[0];
     if (file && (file.type === 'application/pdf' || file.name.endsWith('.pdf'))) {
         selectedFile = file;
         document.getElementById('dropText').textContent = file.name;
@@ -437,21 +1279,20 @@ dropZone.addEventListener('drop', (e) => {
     }
 });
 
-// Upload
 async function uploadProject() {
-    const name = document.getElementById('projectName').value.trim();
+    var name = document.getElementById('projectName').value.trim();
     if (!name || !selectedFile) return;
 
-    const btn = document.getElementById('btnUpload');
+    var btn = document.getElementById('btnUpload');
     btn.disabled = true;
     btn.classList.add('loading');
 
     try {
-        const form = new FormData();
+        var form = new FormData();
         form.append('project_name', name);
         form.append('file', selectedFile);
 
-        const result = await api('/projects/upload', { method: 'POST', body: form });
+        var result = await api('/projects/upload', { method: 'POST', body: form });
         closeModal();
         await loadProjects();
         await loadProject(result.project_id);
@@ -463,24 +1304,547 @@ async function uploadProject() {
     }
 }
 
-// Close modal on overlay click
-document.getElementById('modalOverlay').addEventListener('click', (e) => {
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
     if (e.target === e.currentTarget) closeModal();
 });
+
+// ---------------------------------------------------------------------------
+// Add Items Modal (change orders)
+// ---------------------------------------------------------------------------
+var addItemsFile = null;
+
+function openAddItemsModal() {
+    if (!currentProjectId) return;
+    addItemsFile = null;
+    document.getElementById('addItemsDropText').textContent = 'Drag & drop a PDF here, or click to browse';
+    document.getElementById('addItemsDropText').className = '';
+    document.getElementById('addItemsFileInput').value = '';
+    document.getElementById('btnAddItems').disabled = true;
+    document.getElementById('addItemsOverlay').classList.add('open');
+}
+
+function closeAddItemsModal() {
+    document.getElementById('addItemsOverlay').classList.remove('open');
+}
+
+document.getElementById('addItemsFileInput').addEventListener('change', function(e) {
+    if (e.target.files[0]) {
+        addItemsFile = e.target.files[0];
+        document.getElementById('addItemsDropText').textContent = addItemsFile.name;
+        document.getElementById('addItemsDropText').className = 'selected-file';
+        document.getElementById('btnAddItems').disabled = false;
+    }
+});
+
+var addItemsDropZone = document.getElementById('addItemsDropZone');
+addItemsDropZone.addEventListener('dragover', function(e) { e.preventDefault(); addItemsDropZone.classList.add('drag-over'); });
+addItemsDropZone.addEventListener('dragleave', function() { addItemsDropZone.classList.remove('drag-over'); });
+addItemsDropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    addItemsDropZone.classList.remove('drag-over');
+    var file = e.dataTransfer.files[0];
+    if (file && (file.type === 'application/pdf' || file.name.endsWith('.pdf'))) {
+        addItemsFile = file;
+        document.getElementById('addItemsDropText').textContent = file.name;
+        document.getElementById('addItemsDropText').className = 'selected-file';
+        document.getElementById('btnAddItems').disabled = false;
+    }
+});
+
+async function uploadAdditionalItems() {
+    if (!currentProjectId || !addItemsFile) return;
+
+    var btn = document.getElementById('btnAddItems');
+    btn.disabled = true;
+    btn.classList.add('loading');
+
+    try {
+        var form = new FormData();
+        form.append('file', addItemsFile);
+
+        var result = await api('/projects/' + currentProjectId + '/add-items', { method: 'POST', body: form });
+        closeAddItemsModal();
+
+        if (result.product_count === 0) {
+            alert(result.message || 'No new products found in this PDF. All items already exist in this project.');
+        }
+
+        await loadProject(currentProjectId);
+    } catch (e) {
+        alert('Upload failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+    }
+}
+
+document.getElementById('addItemsOverlay').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) closeAddItemsModal();
+});
+
+// ---------------------------------------------------------------------------
+// Product Library Admin
+// ---------------------------------------------------------------------------
+var adminSearchTimeout = null;
+var adminProducts = [];
+var adminSortField = 'brand';
+var adminSortDir = 'asc';
+
+async function loadProductLibrary(searchQuery) {
+    currentView = 'admin';
+    currentProjectId = null;
+    stopPolling();
+
+    document.getElementById('adminBtn').classList.add('active');
+    document.getElementById('usersBtn').classList.remove('active');
+    document.querySelectorAll('.project-item').forEach(function(el) { el.classList.remove('active'); });
+
+    document.getElementById('projectTitle').textContent = 'Product Library';
+    document.getElementById('topbarActions').style.display = 'none';
+
+    if (!searchQuery) {
+        document.getElementById('content').innerHTML = '<div class="view-loading"><div class="spinner"></div><p>Loading product library...</p></div>';
+    }
+
+    var path = '/products';
+    if (searchQuery) path += '?search=' + encodeURIComponent(searchQuery);
+    adminProducts = await api(path);
+
+    sortAdminProducts();
+    renderAdminView(adminProducts, searchQuery || '');
+}
+
+function renderAdminView(products, searchValue) {
+    var content = document.getElementById('content');
+
+    var total = products.length;
+    var withManual = products.filter(function(p) { return p.manual_source_url; }).length;
+    var withWarranty = products.filter(function(p) { return p.warranty_length; }).length;
+
+    var html = '';
+
+    html += '<div class="stats">';
+    html += '<div class="stat-card total"><div class="label">Total Products</div><div class="value">' + total + '</div></div>';
+    html += '<div class="stat-card found"><div class="label">With Manuals</div><div class="value">' + withManual + '</div></div>';
+    html += '<div class="stat-card" style=""><div class="label">With Warranty</div><div class="value" style="color:#8B5CF6;">' + withWarranty + '</div></div>';
+    html += '<div class="stat-card not-found"><div class="label">Missing Manual</div><div class="value">' + (total - withManual) + '</div></div>';
+    html += '</div>';
+
+    html += '<div class="admin-toolbar">';
+    html += '<input type="text" class="admin-search" id="adminSearch" placeholder="Search by brand or model..." value="' + escapeHtml(searchValue) + '">';
+    html += '<button class="btn-add-product" onclick="openAddProductModal()">+ Add Product</button>';
+    html += '</div>';
+
+    if (products.length > 0) {
+        html += '<div class="table-container"><table>';
+        html += '<thead><tr>';
+        html += '<th class="sortable' + (adminSortField === 'brand' ? ' sort-' + adminSortDir : '') + '" onclick="sortAdminBy(\'brand\')">Brand</th>';
+        html += '<th class="sortable' + (adminSortField === 'model_number' ? ' sort-' + adminSortDir : '') + '" onclick="sortAdminBy(\'model_number\')">Model</th>';
+        html += '<th class="sortable' + (adminSortField === 'product_name' ? ' sort-' + adminSortDir : '') + '" onclick="sortAdminBy(\'product_name\')">Product Name</th>';
+        html += '<th>Manual URL</th><th>Warranty</th><th>Actions</th>';
+        html += '</tr></thead>';
+        html += '<tbody>';
+        products.forEach(function(p) {
+            html += '<tr>';
+            html += '<td>' + escapeHtml(p.brand || '') + '</td>';
+            html += '<td><span class="model-pill">' + escapeHtml(p.model_number || '') + '</span></td>';
+            html += '<td>' + escapeHtml(p.product_name || '') + '</td>';
+            if (p.manual_source_url) {
+                html += '<td><a class="manual-link" href="' + escapeHtml(p.manual_source_url) + '" target="_blank" style="font-size:12px;">' + escapeHtml(p.manual_source_url).substring(0, 40) + '...</a></td>';
+            } else {
+                html += '<td><span style="color:#9CA3AF">-</span></td>';
+            }
+            html += '<td>' + (p.warranty_length ? escapeHtml(p.warranty_length) : '<span style="color:#9CA3AF">-</span>') + '</td>';
+            html += '<td><div class="admin-actions">';
+            html += '<button class="btn-table-edit" onclick="openEditProductModal(\'' + p.id + '\')">Edit</button>';
+            html += '<button class="btn-table-delete" onclick="deleteProductFromAdmin(\'' + p.id + '\', \'' + escapeHtml(p.model_number).replace(/'/g, "\\'") + '\')">Delete</button>';
+            html += '</div></td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+    } else {
+        html += '<div class="empty-state"><h3>No products in library</h3><p>Products are added automatically when projects are processed, or you can add them manually.</p></div>';
+    }
+
+    content.innerHTML = html;
+
+    var searchInput = document.getElementById('adminSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(adminSearchTimeout);
+            adminSearchTimeout = setTimeout(function() {
+                loadProductLibrary(searchInput.value.trim());
+            }, 400);
+        });
+        searchInput.focus();
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
+}
+
+function sortAdminBy(field) {
+    if (adminSortField === field) {
+        adminSortDir = adminSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        adminSortField = field;
+        adminSortDir = 'asc';
+    }
+    sortAdminProducts();
+    var searchInput = document.getElementById('adminSearch');
+    renderAdminView(adminProducts, searchInput ? searchInput.value : '');
+}
+
+function sortAdminProducts() {
+    adminProducts.sort(function(a, b) {
+        var valA = (a[adminSortField] || '').toLowerCase();
+        var valB = (b[adminSortField] || '').toLowerCase();
+        if (valA < valB) return adminSortDir === 'asc' ? -1 : 1;
+        if (valA > valB) return adminSortDir === 'asc' ? 1 : -1;
+        return 0;
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Project items sorting
+// ---------------------------------------------------------------------------
+function sortProjectBy(field) {
+    if (projectSortField === field) {
+        projectSortDir = projectSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        projectSortField = field;
+        projectSortDir = 'asc';
+    }
+    sortProjectItems();
+    renderProjectView(projectItems, projectProgress);
+}
+
+function sortProjectItems() {
+    projectItems.sort(function(a, b) {
+        var valA = (a[projectSortField] || '').toLowerCase();
+        var valB = (b[projectSortField] || '').toLowerCase();
+        if (valA < valB) return projectSortDir === 'asc' ? -1 : 1;
+        if (valA > valB) return projectSortDir === 'asc' ? 1 : -1;
+        return 0;
+    });
+}
+
+// Add / Edit product modal
+var prodSelectedFile = null;
+
+function openAddProductModal() {
+    document.getElementById('productModalTitle').textContent = 'Add Product';
+    document.getElementById('editProductId').value = '';
+    document.getElementById('prodBrand').value = '';
+    document.getElementById('prodModel').value = '';
+    document.getElementById('prodName').value = '';
+    document.getElementById('prodManualUrl').value = '';
+    document.getElementById('prodWarranty').value = '';
+    prodSelectedFile = null;
+    document.getElementById('prodUploadText').textContent = 'Click to select a PDF file';
+    document.getElementById('prodUploadText').className = '';
+    document.getElementById('prodFileInput').value = '';
+    document.getElementById('addProductOverlay').classList.add('open');
+}
+
+async function openEditProductModal(productId) {
+    var products = await api('/products');
+    var p = products.find(function(x) { return x.id === productId; });
+    if (!p) return;
+
+    document.getElementById('productModalTitle').textContent = 'Edit Product';
+    document.getElementById('editProductId').value = p.id;
+    document.getElementById('prodBrand').value = p.brand || '';
+    document.getElementById('prodModel').value = p.model_number || '';
+    document.getElementById('prodName').value = p.product_name || '';
+    document.getElementById('prodManualUrl').value = p.manual_source_url || '';
+    document.getElementById('prodWarranty').value = p.warranty_length || '';
+    prodSelectedFile = null;
+    document.getElementById('prodUploadText').textContent = 'Click to select a PDF file';
+    document.getElementById('prodUploadText').className = '';
+    document.getElementById('prodFileInput').value = '';
+    document.getElementById('addProductOverlay').classList.add('open');
+}
+
+function closeAddProductModal() {
+    document.getElementById('addProductOverlay').classList.remove('open');
+}
+
+document.getElementById('prodFileInput').addEventListener('change', function(e) {
+    if (e.target.files[0]) {
+        prodSelectedFile = e.target.files[0];
+        document.getElementById('prodUploadText').textContent = prodSelectedFile.name;
+        document.getElementById('prodUploadText').className = 'selected-file';
+    }
+});
+
+async function saveProductFromModal() {
+    var editId = document.getElementById('editProductId').value;
+    var data = {
+        brand: document.getElementById('prodBrand').value.trim(),
+        model_number: document.getElementById('prodModel').value.trim(),
+        product_name: document.getElementById('prodName').value.trim(),
+        manual_source_url: document.getElementById('prodManualUrl').value.trim() || null,
+        warranty_length: document.getElementById('prodWarranty').value.trim() || null,
+    };
+
+    if (!data.model_number) {
+        alert('Model number is required.');
+        return;
+    }
+
+    var btn = document.getElementById('btnSaveProduct');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+        var productId = editId;
+
+        if (editId) {
+            await api('/products/' + editId, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+        } else {
+            var created = await api('/products', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            productId = created.id;
+        }
+
+        if (prodSelectedFile && productId) {
+            var form = new FormData();
+            form.append('file', prodSelectedFile);
+            await api('/products/' + productId + '/upload-manual', { method: 'POST', body: form });
+        }
+
+        closeAddProductModal();
+        await loadProductLibrary();
+    } catch (e) {
+        alert('Save failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Product';
+    }
+}
+
+async function deleteProductFromAdmin(productId, modelNumber) {
+    if (!confirm('Delete product ' + modelNumber + ' from the library?')) return;
+    var btn = event.target.closest('button') || event.target;
+    btn.classList.add('btn-working');
+    try {
+        await api('/products/' + productId, { method: 'DELETE' });
+        await loadProductLibrary();
+    } catch (e) {
+        alert('Delete failed: ' + e.message);
+        btn.classList.remove('btn-working');
+    }
+}
+
+document.getElementById('addProductOverlay').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) closeAddProductModal();
+});
+
+// ---------------------------------------------------------------------------
+// User Management (admin only)
+// ---------------------------------------------------------------------------
+async function loadUserManagement() {
+    currentView = 'users';
+    currentProjectId = null;
+    stopPolling();
+
+    document.getElementById('usersBtn').classList.add('active');
+    document.getElementById('adminBtn').classList.remove('active');
+    document.querySelectorAll('.project-item').forEach(function(el) { el.classList.remove('active'); });
+
+    document.getElementById('projectTitle').textContent = 'User Management';
+    document.getElementById('topbarActions').style.display = 'none';
+    document.getElementById('content').innerHTML = '<div class="view-loading"><div class="spinner"></div><p>Loading users...</p></div>';
+
+    try {
+        var users = await api('/admin/users');
+        renderUsersView(users);
+    } catch (e) {
+        document.getElementById('content').innerHTML = '<div class="empty-state"><h3>Access Denied</h3><p>' + escapeHtml(e.message) + '</p></div>';
+    }
+}
+
+function renderUsersView(users) {
+    var content = document.getElementById('content');
+
+    var total = users.length;
+    var approved = users.filter(function(u) { return u.approved; }).length;
+    var pending = users.filter(function(u) { return !u.approved; }).length;
+
+    var html = '';
+
+    // Stats
+    html += '<div class="stats">';
+    html += '<div class="stat-card total"><div class="label">Total Users</div><div class="value">' + total + '</div></div>';
+    html += '<div class="stat-card found"><div class="label">Active</div><div class="value">' + approved + '</div></div>';
+    html += '<div class="stat-card processing"><div class="label">Pending Approval</div><div class="value">' + pending + '</div></div>';
+    html += '<div class="stat-card"><div class="label">&nbsp;</div><div class="value">&nbsp;</div></div>';
+    html += '</div>';
+
+    // Users table
+    if (users.length > 0) {
+        html += '<div class="table-container"><table>';
+        html += '<thead><tr>';
+        html += '<th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Registered</th><th>Actions</th>';
+        html += '</tr></thead>';
+        html += '<tbody>';
+        users.forEach(function(u) {
+            var d = new Date(u.created_at);
+            var dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            var isSelf = currentUser && u.id === currentUser.id;
+
+            html += '<tr>';
+            html += '<td>' + escapeHtml(u.name) + (isSelf ? ' <span style="color:#9CA3AF;font-size:11px;">(you)</span>' : '') + '</td>';
+            html += '<td>' + escapeHtml(u.email) + '</td>';
+            html += '<td><span class="role-badge role-badge-' + u.role + '">' + u.role.toUpperCase() + '</span></td>';
+            html += '<td>';
+            if (u.approved) {
+                html += '<span class="badge badge-active">Active</span>';
+            } else {
+                html += '<span class="badge badge-pending-approval">Pending</span>';
+            }
+            html += '</td>';
+            html += '<td style="font-size:12px;color:#6B7280;">' + dateStr + '</td>';
+            html += '<td><div class="admin-actions">';
+
+            if (!isSelf) {
+                if (!u.approved) {
+                    html += '<button class="btn-table-approve" onclick="approveUser(\'' + u.id + '\')">Approve</button>';
+                    html += '<button class="btn-table-delete" onclick="denyUser(\'' + u.id + '\', \'' + escapeHtml(u.name).replace(/'/g, "\\'") + '\')">Deny</button>';
+                } else {
+                    if (u.role === 'pm') {
+                        html += '<button class="btn-table-edit" onclick="toggleUserRole(\'' + u.id + '\', \'admin\')">Make Admin</button>';
+                    } else {
+                        html += '<button class="btn-table-edit" onclick="toggleUserRole(\'' + u.id + '\', \'pm\')">Make PM</button>';
+                    }
+                    html += '<button class="btn-table-delete" onclick="deactivateUser(\'' + u.id + '\', \'' + escapeHtml(u.name).replace(/'/g, "\\'") + '\')">Deactivate</button>';
+                }
+            } else {
+                html += '<span style="color:#9CA3AF;font-size:11px;">-</span>';
+            }
+
+            html += '</div></td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+    } else {
+        html += '<div class="empty-state"><h3>No users</h3><p>Users will appear here after they register.</p></div>';
+    }
+
+    content.innerHTML = html;
+}
+
+async function approveUser(userId) {
+    var btn = event.target.closest('button') || event.target;
+    btn.classList.add('btn-working');
+    try {
+        await api('/admin/users/' + userId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approved: true }),
+        });
+        await loadUserManagement();
+    } catch (e) {
+        alert('Failed: ' + e.message);
+        btn.classList.remove('btn-working');
+    }
+}
+
+async function denyUser(userId, name) {
+    if (!confirm('Deny and delete account for ' + name + '?')) return;
+    var btn = event.target.closest('button') || event.target;
+    btn.classList.add('btn-working');
+    try {
+        await api('/admin/users/' + userId, { method: 'DELETE' });
+        await loadUserManagement();
+    } catch (e) {
+        alert('Failed: ' + e.message);
+        btn.classList.remove('btn-working');
+    }
+}
+
+async function deactivateUser(userId, name) {
+    if (!confirm('Deactivate account for ' + name + '? They will not be able to log in.')) return;
+    var btn = event.target.closest('button') || event.target;
+    btn.classList.add('btn-working');
+    try {
+        await api('/admin/users/' + userId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approved: false }),
+        });
+        await loadUserManagement();
+    } catch (e) {
+        alert('Failed: ' + e.message);
+        btn.classList.remove('btn-working');
+    }
+}
+
+async function toggleUserRole(userId, newRole) {
+    var btn = event.target.closest('button') || event.target;
+    btn.classList.add('btn-working');
+    try {
+        await api('/admin/users/' + userId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: newRole }),
+        });
+        await loadUserManagement();
+    } catch (e) {
+        alert('Failed: ' + e.message);
+        btn.classList.remove('btn-working');
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
 function escapeHtml(text) {
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
 // ---------------------------------------------------------------------------
-// Init
+// Init — check if already logged in
 // ---------------------------------------------------------------------------
-loadProjects();
+async function initApp() {
+    if (!authToken) {
+        document.getElementById('authScreen').classList.remove('hidden');
+        return;
+    }
+
+    // Validate token
+    try {
+        var resp = await fetch('/api/auth/me', {
+            headers: { 'Authorization': 'Bearer ' + authToken },
+        });
+
+        if (!resp.ok) {
+            // Token expired or invalid
+            authToken = null;
+            localStorage.removeItem('ati_token');
+            document.getElementById('authScreen').classList.remove('hidden');
+            return;
+        }
+
+        currentUser = await resp.json();
+        document.getElementById('authScreen').classList.add('hidden');
+        updateUIForRole();
+        loadProjects();
+    } catch (e) {
+        // Server not reachable
+        document.getElementById('authScreen').classList.remove('hidden');
+    }
+}
+
+initApp();
 </script>
 
 </body>

@@ -1,8 +1,20 @@
+-- Users: project managers and admins
+CREATE TABLE IF NOT EXISTS users (
+    id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    email         TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'pm',  -- 'pm' | 'admin'
+    approved      BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Projects: one per contract/job
 CREATE TABLE IF NOT EXISTS projects (
     id               UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name             TEXT NOT NULL,
     contract_pdf_path TEXT,
+    user_id          UUID REFERENCES users(id),
     created_at       TIMESTAMPTZ DEFAULT NOW(),
     updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
